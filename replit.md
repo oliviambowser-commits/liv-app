@@ -1,9 +1,11 @@
-# [Project name]
+# Liv Product Advisor
 
-_Replace the heading above with the project's name, and this line with one sentence describing what this app does for users._
+Liv helps thoughtful shoppers compare everyday products using transparent, evidence-aware information and clear uncertainty.
 
 ## Run & Operate
 
+- `pnpm --filter @workspace/liv run dev` — run the Expo mobile app.
+- `pnpm --filter @workspace/liv run typecheck` — typecheck the mobile app.
 - `pnpm --filter @workspace/api-server run dev` — run the API server (port 5000)
 - `pnpm run typecheck` — full typecheck across all packages
 - `pnpm run build` — typecheck + build all packages
@@ -22,23 +24,33 @@ _Replace the heading above with the project's name, and this line with one sente
 
 ## Where things live
 
-_Populate as you build — short repo map plus pointers to the source-of-truth file for DB schema, API contracts, theme files, etc._
+- `artifacts/liv/` — Expo / React Native mobile app.
+- `artifacts/liv/app/` — Expo Router screens and navigation.
+- `artifacts/liv/constants/colors.ts` — app color tokens.
+- `artifacts/liv/assets/images/` — app icon and clearly labeled demo product imagery.
 
 ## Architecture decisions
 
-_Populate as you build — non-obvious choices a reader couldn't infer from the code (3-5 bullets)._
+- M0 is a local prototype: persist preferences, saved items, comparison, and demo history on-device; do not add a backend or real catalog integration without a separate product decision.
+- Product score dimensions are shown separately; there is no combined Liv Score.
+- Community star rating (1–5) is distinct from the 1–100 Community Experience dimension.
 
 ## Product
 
-_Describe the high-level user-facing capabilities of this app once they exist._
+- Ten-screen prototype: onboarding, Home, Ask Liv, Search, Scan, Product Detail, Community, Profile & Memory, Compare, and Saved.
+- Product breakdown dimensions include Ingredients & Safety, Effectiveness, Transparency, Community Experience, and Value. M0 values and evidence cards are illustrative demo content, not live research.
+- Scoring must disclose evidence gaps and never imply universal safety or a personal health guarantee.
 
 ## User preferences
 
-_Populate as you build — explicit user instructions worth remembering across sessions._
+- Use Manrope for headlines and Inter for body text and UI.
+- Brand palette: plum, lavender, vanilla latte, sage, warm taupe, charcoal, and a restrained gold aspen-leaf accent. Use sans-serif typography throughout.
+- Follow the supplied mockup navigation: Home, Search, Scan, Community, Profile. Ask Liv is a pushed screen; Saved is reached from Profile and product actions.
 
 ## Gotchas
 
-_Populate as you build — sharp edges, "always run X before Y" rules._
+- Label sample products, scores, ingredient evidence, and community content as demo; do not present them as sourced internet data or authentic reviews.
+- Do not silently select a product when a query is ambiguous, and do not turn an unknown field into a negative score.
 
 ## Pointers
 

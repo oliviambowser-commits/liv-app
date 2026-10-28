@@ -1,0 +1,24 @@
+kind = "mobile"
+previewPath = "/"
+title = "Liv Product Advisor"
+description = "A warm, evidence-aware personal product advisor. Explore product details, ingredient evidence, category-specific score breakdowns, and a separate community rating in a clearly labeled local demo."
+version = "1.0.0"
+id = "artifacts/liv"
+router = "expo-domain"
+
+[[services]]
+name = "expo"
+ensurePreviewReachable = "/status"
+paths = [ "/" ]
+localPort = 23060
+
+[services.development]
+run = "pnpm --filter @workspace/liv run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/liv", "run", "build" ]
+run = [ "pnpm", "--filter", "@workspace/liv", "run", "serve" ]
+
+[services.env]
+PORT = "23060"
+BASE_PATH = "/"
