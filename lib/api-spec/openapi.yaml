@@ -10,6 +10,8 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: catalog
+    description: Curated source-attributed skincare catalog
 paths:
   /healthz:
     get:
@@ -24,6 +26,55 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /catalog/products:
+    get:
+      operationId: searchCatalogProducts
+      tags: [catalog]
+      summary: Search the curated sourced product pilot
+      parameters:
+        - name: q
+          in: query
+          required: false
+          schema:
+            type: string
+            maxLength: 80
+      responses:
+        "200":
+          description: Matching products and source metadata
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [products]
+                properties:
+                  products:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/LivProduct"
+  /catalog/products/{id}:
+    get:
+      operationId: getCatalogProduct
+      tags: [catalog]
+      summary: Get a sourced product by canonical barcode identifier
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Product with provenance and evidence status
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [product]
+                properties:
+                  product:
+                    $ref: "#/components/schemas/LivProduct"
+        "404":
+          description: No product matches the identifier
 components:
   schemas:
     HealthStatus:
@@ -33,4 +84,55 @@ components:
           type: string
       required:
         - status
+    LivProduct:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Canonical barcode identifier for this exact product record
+        brand:
+          type: string
+        name:
+          type: string
+        category:
+          type: string
+        quantity:
+          type: [string, "null"]
+        ingredientsText:
+          type: [string, "null"]
+        sourceStatus:
+          type: string
+        sources:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        ingredientEvidence:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        scores:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        communityRating:
+          type: [number, "null"]
+        communityReviewCount:
+          type: [integer, "null"]
+        communityRatingSource:
+          type: [string, "null"]
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - brand
+        - name
+        - category
+        - sourceStatus
+        - sources
+        - ingredientEvidence
+        - scores
 

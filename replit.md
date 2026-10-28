@@ -31,9 +31,11 @@ Liv helps thoughtful shoppers compare everyday products using transparent, evide
 
 ## Architecture decisions
 
-- M0 is a local prototype: persist preferences, saved items, comparison, and demo history on-device; do not add a backend or real catalog integration without a separate product decision.
+- M0 remains a local prototype for sample content. The approved sourced skincare pilot uses the existing API and development database for public catalog facts and provenance only; do not add paid providers, user accounts, or external credentials without explicit approval.
 - Product score dimensions are shown separately; there is no combined Liv Score.
 - Community star rating (1–5) is distinct from the 1–100 Community Experience dimension.
+- Sourced product records must include source links, source type, retrieval date, and license/attribution details. Community-contributed product data must not be presented as manufacturer-verified.
+- Do not display a numeric dimension score or community rating unless its published method and authentic evidence support it. Unknown values remain unavailable.
 
 ## Product
 

@@ -1,10 +1,11 @@
 import React, { useMemo, useState } from 'react';
-import { Alert, Image, Keyboard, Modal, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { Alert, Image, Keyboard, Linking, Modal, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { DIMENSIONS, Product, PRODUCTS, useLiv } from '../state/LivContext';
 import colors from '../constants/colors';
+import { CatalogProduct, getCatalogProduct, searchCatalog } from '../lib/catalog';
 
 const C = colors.light;
 const display = 'Manrope_700Bold';
@@ -39,7 +40,6 @@ function Chip({ label, active, onPress }: { label: string; active?: boolean; onP
 function SectionTitle({ children, action, onAction }: any) {
   return <View style={s.sectionRow}><Txt style={s.sectionTitle}>{children}</Txt>{action && <Pressable onPress={onAction}><Txt style={s.smallLink}>{action}</Txt></Pressable>}</View>;
 }
-function productById(id?: string) { return PRODUCTS.find((p) => p.id === id) ?? PRODUCTS[0]; }
 function ProductCard({ product, compact = false }: { product: Product; compact?: boolean }) {
   const router = useRouter();
   const { saved, toggleSaved, addCompare, visit } = useLiv();
@@ -87,14 +87,43 @@ function QuickAction({ icon, label, onPress }: { icon: any; label: string; onPre
 export function SearchScreen() {
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState('All');
+  const [catalog, setCatalog] = useState<CatalogProduct[]>([]);
+  const [catalogLoading, setCatalogLoading] = useState(true);
+  const [catalogError, setCatalogError] = useState('');
   const filters = ['All', 'Skincare', 'Hair', 'Body', 'Home'];
   const matches = useMemo(() => PRODUCTS.filter((p) => (filter === 'All' || p.category === filter) && `${p.name} ${p.brand} ${p.category} ${p.ingredients.map((i) => i.name).join(' ')}`.toLowerCase().includes(query.toLowerCase().trim())), [query, filter]);
+  React.useEffect(() => {
+    let active = true;
+    const timer = setTimeout(() => {
+      setCatalogLoading(true);
+      searchCatalog(query).then((items) => {
+        if (active) { setCatalog(items); setCatalogError(''); }
+      }).catch((error: unknown) => {
+        if (active) setCatalogError(error instanceof Error ? error.message : 'Sourced products are unavailable.');
+      }).finally(() => { if (active) setCatalogLoading(false); });
+    }, 220);
+    return () => { active = false; clearTimeout(timer); };
+  }, [query]);
   return <Page><Header title="Search"/><View style={s.pageIntro}><Txt style={s.pageTitle}>Find your next<br/>informed choice.</Txt><Txt style={s.introCopy}>Search a product, brand, category or ingredient.</Txt></View>
     <View style={s.searchBox}><Feather name="search" size={18} color={C.mutedForeground}/><TextInput value={query} onChangeText={setQuery} placeholder="Try “ceramides”" placeholderTextColor={C.mutedForeground} style={s.searchInput} autoCorrect={false} accessibilityLabel="Search products and ingredients"/>{query.length > 0 && <Pressable onPress={() => setQuery('')} accessibilityLabel="Clear search"><Feather name="x-circle" size={18} color={C.mutedForeground}/></Pressable>}</View>
     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.chipRow}>{filters.map((x) => <Chip key={x} label={x} active={filter === x} onPress={() => setFilter(x)}/>)}</ScrollView>
+    <View style={s.sourceHeading}><SectionTitle>Sourced skincare pilot</SectionTitle><Txt style={s.sourceCaption}>Open Beauty Facts · community-submitted records</Txt></View>
+    {catalogLoading && <Txt style={s.scoreMeta}>Loading sourced records…</Txt>}
+    {!!catalogError && <View style={s.unknownCard}><Feather name="wifi-off" size={17} color={C.primary}/><Txt style={[s.consentCopy,{flex:1}]}>{catalogError} Try again when the catalog is available.</Txt></View>}
+    {!catalogLoading && !catalogError && catalog.filter((p) => filter === 'All' || filter === 'Skincare').length === 0 && <Txt style={s.scoreMeta}>No sourced match in this small pilot.</Txt>}
+    {catalog.filter((p) => filter === 'All' || filter === 'Skincare').map((p) => <CatalogProductCard key={p.id} product={p}/>)}
+    <SectionTitle>Illustrative demo products</SectionTitle>
     <DemoTag/><SectionTitle>{query ? `${matches.length} sample result${matches.length === 1 ? '' : 's'}` : 'A few places to begin'}</SectionTitle>
     {matches.length ? matches.map((p) => <ProductCard key={p.id} product={p}/>) : <View style={s.emptyCard}><View style={s.emptyIcon}><Feather name="search" size={21} color={C.primary}/></View><Txt style={s.emptyTitle}>Nothing in this small sample set</Txt><Txt style={s.emptyCopy}>Try another name or ingredient, or reset your filters.</Txt><Button title="Reset search" secondary onPress={() => { setQuery(''); setFilter('All'); }}/></View>}
   </Page>;
+}
+
+function CatalogProductCard({ product }: { product: CatalogProduct }) {
+  const router = useRouter();
+  return <Pressable onPress={() => router.push(`/product/${product.id}`)} style={[s.productCard,s.catalogCard]} accessibilityRole="button" accessibilityLabel={`View sourced record: ${product.brand} ${product.name}`}>
+    <View style={s.productInfo}><Txt style={s.brand}>{product.brand}</Txt><Txt style={s.productName}>{product.name}</Txt><Txt style={s.productMeta}>{product.quantity || 'Package size not listed'} · barcode {product.id}</Txt><Txt style={s.scoreMeta}>Community-submitted · not independently verified</Txt></View>
+    <Feather name="chevron-right" size={18} color={C.mutedForeground}/>
+  </Pressable>;
 }
 
 export function ScanScreen() {
@@ -161,7 +190,13 @@ export function OnboardingScreen() {
 }
 
 export function ProductScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>(); const product = productById(id); const router = useRouter();
+  const { id } = useLocalSearchParams<{ id: string }>();
+  const product = PRODUCTS.find((item) => item.id === id);
+  return product ? <DemoProductDetail product={product}/> : <SourcedProductDetail id={String(id ?? '')}/>;
+}
+
+function DemoProductDetail({ product }: { product: Product }) {
+  const router = useRouter();
   const { saved, toggleSaved, addCompare, visit } = useLiv();
   React.useEffect(() => { visit(product.id); }, [product.id]);
   return <Page><Header title="Product details" back action={saved.includes(product.id) ? 'Saved' : 'Save'} onAction={() => toggleSaved(product.id)}/>
@@ -177,6 +212,34 @@ export function ProductScreen() {
     <SectionTitle>Similar sample products</SectionTitle>{PRODUCTS.filter((p) => p.id !== product.id).slice(0, 2).map((p) => <ProductCard key={p.id} product={p}/>)}
     <View style={s.actionRow}><Button title="Compare" secondary icon="columns" onPress={() => { addCompare(product.id); router.push('/compare'); }}/><Button title="Ask Liv" icon="message-square" onPress={() => router.push({ pathname: '/ask', params: { product: product.id } })}/></View>
     <Txt style={s.verified}>Last verified: {product.lastVerified} · Not a live product lookup</Txt>
+  </Page>;
+}
+
+function SourcedProductDetail({ id }: { id: string }) {
+  const [product, setProduct] = useState<CatalogProduct | null>(null);
+  const [error, setError] = useState('');
+  React.useEffect(() => {
+    let active = true;
+    getCatalogProduct(id).then((item) => { if (active) { setProduct(item); setError(''); } })
+      .catch((reason: unknown) => { if (active) setError(reason instanceof Error ? reason.message : 'Could not load this sourced record.'); });
+    return () => { active = false; };
+  }, [id]);
+  const router = useRouter();
+  if (error) return <Page><Header title="Product details" back/><View style={s.emptyCard}><Txt style={s.emptyTitle}>Sourced record unavailable</Txt><Txt style={s.emptyCopy}>{error}</Txt><Button title="Back to search" secondary onPress={() => router.back()}/></View></Page>;
+  if (!product) return <Page><Header title="Product details" back/><Txt style={s.scoreMeta}>Loading sourced product…</Txt></Page>;
+  const staleSources = product.sources.filter((source) => source.sourceUpdatedAt && Date.now() - new Date(source.sourceUpdatedAt).getTime() > 180 * 24 * 60 * 60 * 1000);
+  return <Page><Header title="Product details" back/>
+    <View style={s.pageIntro}><Txt style={s.brand}>{product.brand}</Txt><Txt style={s.pageTitle}>{product.name}</Txt><Txt style={s.introCopy}>{product.category} · {product.quantity || 'Package size not supplied'} · barcode {product.id}</Txt></View>
+    <View style={s.unknownCard}><Feather name="alert-circle" size={18} color={C.primary}/><View style={{flex:1}}><Txt style={s.unknownTitle}>Community-submitted product record</Txt><Txt style={s.consentCopy}>Ingredient data comes from a public collaborative database and has not been independently confirmed against this package. Check the label before relying on it.</Txt></View></View>
+    {staleSources.length > 0 && <View style={s.unknownCard}><Feather name="clock" size={18} color={C.primary}/><Txt style={[s.consentCopy,{flex:1}]}>A source record is over six months old. Treat its product details as potentially outdated until the current package is checked.</Txt></View>}
+    <SectionTitle>Liv’s breakdown</SectionTitle><Txt style={s.subtleDisclaimer}>Separate dimensions · no combined score. Numbers appear only when the evidence supports the method.</Txt>
+    {product.scores.map((score) => <View key={score.dimension} style={s.scoreRow}><View style={s.scoreTop}><Txt style={s.scoreName}>{score.dimension}</Txt><Txt style={s.scoreMeta}>{score.value == null ? 'Not enough information' : `${score.value}/100`}</Txt></View>{score.value != null && <View style={s.scoreTrack}><View style={[s.scoreFill,{width:`${score.value}%`}]}/></View>}<Txt style={s.scoreRationale}>{score.rationale}</Txt><Txt style={s.scoreMeta}>Method: {score.method}</Txt><Txt style={s.scoreMeta}>Coverage: {score.coverage}</Txt></View>)}
+    <View style={s.ratingUnavailable}><Feather name="star" size={17} color={C.primary}/><Txt style={s.consentCopy}>Community rating: not available. This pilot has no verified review source or Liv member reviews.</Txt></View>
+    <SectionTitle>Ingredient label record</SectionTitle><Txt style={s.subtleDisclaimer}>Raw text from the cited community database; not a verified formula or safety assessment.</Txt>
+    <View style={s.ingredientCard}><Txt style={s.ingredientNote}>{product.ingredientsText || 'No ingredient list is available for this record.'}</Txt></View>
+    {!!product.ingredientEvidence.length && <><SectionTitle>Ingredient-level research</SectionTitle>{product.ingredientEvidence.map((item) => <View key={item.url} style={s.ingredientCard}><Txt style={s.ingredientName}>{item.ingredient}: {item.title}</Txt><Txt style={s.ingredientNote}>{item.summary}</Txt><Txt style={s.scoreMeta}>{item.studyDesign} · Retrieved {item.retrievedAt}</Txt><Txt style={s.scoreMeta}>Coverage: {item.coverage}</Txt><Txt style={s.scoreMeta}>Confidence: {item.confidence}</Txt><Txt style={s.scoreMeta}>{item.limitation}</Txt><Pressable onPress={() => Linking.openURL(item.url)}><Txt style={s.smallLink}>Open PubMed source ↗</Txt></Pressable></View>)}</>}
+    <SectionTitle>Sources</SectionTitle>{product.sources.map((source) => <Pressable key={source.url} onPress={() => Linking.openURL(source.url)} style={s.sourceRow}><View style={{flex:1}}><Txt style={s.postProductName}>{source.label}</Txt><Txt style={s.scoreMeta}>{source.note}</Txt><Txt style={s.scoreMeta}>{source.sourceUpdatedAt ? `Source record last changed ${source.sourceUpdatedAt} · ` : ''}Retrieved ${source.retrievedAt}{source.license ? ` · ${source.license}` : ''}</Txt></View><Feather name="external-link" size={16} color={C.primary}/></Pressable>)}
+    <Txt style={s.verified}>Record last updated: {new Date(product.updatedAt).toLocaleDateString()}</Txt>
   </Page>;
 }
 
@@ -274,6 +337,7 @@ const s = StyleSheet.create({
   detailImageWrap: { position: 'relative' }, detailImage: { width: '100%', height: 248, borderRadius: 22, backgroundColor: C.muted }, imageDemo: { position: 'absolute', top: 10, left: 10 }, productHeading: { paddingTop: 14, paddingBottom: 8 }, detailTitle: { fontFamily: display, color: C.foreground, fontSize: 26, lineHeight: 33, letterSpacing: -0.7 }, ratingLine: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 9 }, fitCard: { backgroundColor: C.lavender, borderRadius: 18, padding: 15, borderLeftWidth: 3, borderLeftColor: C.gold, marginVertical: 12 }, fitTitle: { fontFamily: semi, color: C.primary, fontSize: 13 }, fitCopy: { fontFamily: body, color: C.foreground, fontSize: 12, lineHeight: 18, marginTop: 8 }, subtleDisclaimer: { fontFamily: body, fontSize: 10, lineHeight: 15, color: C.mutedForeground, marginTop: -6, marginBottom: 10 },
   scoreRow: { paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: C.border }, scoreTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }, scoreName: { fontFamily: medium, fontSize: 12, color: C.foreground }, scoreValue: { fontFamily: display, color: C.primary, fontSize: 17 }, scoreOut: { fontFamily: medium, color: C.mutedForeground, fontSize: 10 }, scoreTrack: { height: 6, backgroundColor: C.lavender, borderRadius: 4, marginTop: 8, overflow: 'hidden' }, scoreFill: { height: 6, borderRadius: 4, backgroundColor: C.primary }, scoreRationale: { fontFamily: body, color: C.foreground, fontSize: 11, lineHeight: 16, marginTop: 7 }, scoreMeta: { fontFamily: body, color: C.mutedForeground, fontSize: 9, lineHeight: 14, marginTop: 4 },
   ingredientCard: { backgroundColor: C.lavender, borderRadius: 17, padding: 14, marginBottom: 10 }, ingredientHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 7 }, ingredientName: { flex: 1, fontFamily: semi, fontSize: 13, color: C.foreground }, evidenceLabel: { fontFamily: semi, fontSize: 9, color: C.primary, backgroundColor: C.card, paddingHorizontal: 8, paddingVertical: 5, borderRadius: 20 }, ingredientNote: { fontFamily: body, color: C.mutedForeground, fontSize: 12, lineHeight: 18, marginTop: 9 }, unknownCard: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, backgroundColor: C.card, borderColor: C.border, borderWidth: 1, borderRadius: 16, padding: 13, marginVertical: 13 }, unknownTitle: { fontFamily: semi, fontSize: 12, color: C.foreground, marginBottom: 4 }, reviewCard: { backgroundColor: C.card, borderRadius: 17, borderWidth: 1, borderColor: C.border, padding: 13 }, actionRow: { flexDirection: 'row', gap: 9, marginTop: 10 }, verified: { fontFamily: body, color: C.mutedForeground, textAlign: 'center', fontSize: 9, marginTop: 12 },
+  sourceHeading: { marginTop: 8 }, sourceCaption: { fontFamily: body, fontSize: 10, color: C.mutedForeground, marginTop: -7, marginBottom: 8 }, catalogCard: { alignItems: 'center', paddingHorizontal: 14, minHeight: 92 }, ratingUnavailable: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, backgroundColor: C.lavender, borderRadius: 14, padding: 12, marginVertical: 10 }, sourceRow: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: C.card, borderRadius: 14, padding: 12, marginBottom: 8, borderWidth: 1, borderColor: C.border },
   askWelcome: { alignItems: 'flex-start', backgroundColor: C.lavender, borderRadius: 21, padding: 17, marginTop: 6, marginBottom: 12 }, askBrandMark: { width: 42, height: 42, borderRadius: 15, backgroundColor: C.primary, alignItems: 'center', justifyContent: 'center', marginBottom: 13 }, askBrandText: { fontFamily: display, color: C.primaryForeground, fontSize: 16 }, contextProduct: { flexDirection: 'row', alignItems: 'center', gap: 9, backgroundColor: C.card, borderWidth: 1, borderColor: C.border, borderRadius: 15, padding: 9, marginBottom: 8 }, contextImage: { width: 48, height: 48, borderRadius: 11 }, suggestion: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', minHeight: 48, borderBottomWidth: 1, borderColor: C.border }, suggestionText: { fontFamily: medium, color: C.foreground, fontSize: 12 }, message: { padding: 14, borderRadius: 17, marginVertical: 6 }, userMessage: { backgroundColor: C.primary, marginLeft: 28 }, livMessage: { backgroundColor: C.lavender, marginRight: 16 }, messageRole: { fontFamily: semi, fontSize: 9, letterSpacing: 0.7, color: C.primary, marginBottom: 7 }, messageText: { fontFamily: body, color: C.foreground, fontSize: 13, lineHeight: 20 }, chatComposer: { flexDirection: 'row', alignItems: 'flex-end', padding: 7, gap: 7, backgroundColor: C.card, borderRadius: 17, borderWidth: 1, borderColor: C.border, marginTop: 18 }, chatInput: { flex: 1, maxHeight: 90, minHeight: 39, paddingHorizontal: 9, paddingVertical: 9, fontFamily: body, color: C.foreground, fontSize: 13 },
   segment: { flexDirection: 'row', gap: 5, justifyContent: 'space-between', marginBottom: 5 }, compareProducts: { flexDirection: 'row', gap: 9, marginVertical: 13 }, compareProduct: { flex: 1, position: 'relative', backgroundColor: C.card, borderRadius: 16, borderWidth: 1, borderColor: C.border, padding: 8 }, compareImage: { width: '100%', height: 100, borderRadius: 11, marginBottom: 8 }, removeCompare: { position: 'absolute', right: 12, top: 12, width: 27, height: 27, borderRadius: 12, backgroundColor: C.card, alignItems: 'center', justifyContent: 'center' }, compareName: { fontFamily: semi, fontSize: 11, color: C.foreground, lineHeight: 15 }, addProduct: { flex: 1, height: 175, borderRadius: 16, borderWidth: 1, borderStyle: 'dashed', borderColor: C.taupe, backgroundColor: C.card, alignItems: 'center', justifyContent: 'center', gap: 8 }, addProductText: { fontFamily: medium, fontSize: 10, color: C.mutedForeground, textAlign: 'center' }, addRow: { flexDirection: 'row', alignItems: 'center', gap: 10, borderBottomWidth: 1, borderBottomColor: C.border, paddingVertical: 9 }, addRowImage: { width: 44, height: 44, borderRadius: 11 }, compareDimension: { marginTop: 12, padding: 13, backgroundColor: C.card, borderWidth: 1, borderColor: C.border, borderRadius: 16 }, compareDimensionTitle: { fontFamily: semi, fontSize: 12, color: C.foreground, marginBottom: 8 }, compareScore: { flexDirection: 'column', alignItems: 'stretch', gap: 1, marginVertical: 4 },
   listCard: { backgroundColor: C.card, borderRadius: 18, borderWidth: 1, borderColor: C.border, marginBottom: 12, padding: 13 }, listHeading: { flexDirection: 'row', alignItems: 'center', gap: 10 }, listIcon: { width: 38, height: 38, backgroundColor: C.lavender, borderRadius: 13, alignItems: 'center', justifyContent: 'center' }, listName: { fontFamily: semi, fontSize: 13, color: C.foreground }, listProducts: { paddingTop: 13 }, listProduct: { flexDirection: 'row', alignItems: 'center', gap: 9, paddingVertical: 7 }, listProductImage: { width: 37, height: 37, borderRadius: 9 }, listProductName: { flex: 1, fontFamily: medium, color: C.foreground, fontSize: 11 }, unsave: { alignSelf: 'flex-end', flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 6, paddingBottom: 7 }, modalBackdrop: { flex: 1, backgroundColor: 'rgba(46,43,43,0.38)', justifyContent: 'center', padding: 22 }, modalCard: { backgroundColor: C.background, borderRadius: 22, padding: 18 }, modalTitle: { fontFamily: display, color: C.foreground, fontSize: 19, marginBottom: 15 }, modalActions: { flexDirection: 'row', gap: 9 },
