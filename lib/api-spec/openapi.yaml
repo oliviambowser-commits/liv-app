@@ -12,6 +12,8 @@ tags:
     description: Health operations
   - name: catalog
     description: Curated source-attributed skincare catalog
+  - name: liv-ai
+    description: Source-grounded Liv assistant
 paths:
   /healthz:
     get:
@@ -75,6 +77,73 @@ paths:
                     $ref: "#/components/schemas/LivProduct"
         "404":
           description: No product matches the identifier
+  /liv/ask:
+    post:
+      operationId: askLiv
+      tags: [liv-ai]
+      summary: Ask Liv using catalog evidence and optional web research
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [question]
+              properties:
+                question:
+                  type: string
+                  minLength: 1
+                  maxLength: 1200
+                productId:
+                  type: string
+                  maxLength: 40
+                history:
+                  type: array
+                  maxItems: 8
+                  items:
+                    type: object
+                    required: [role, content]
+                    properties:
+                      role:
+                        type: string
+                        enum: [user, assistant]
+                      content:
+                        type: string
+                        maxLength: 1200
+                preferences:
+                  type: array
+                  maxItems: 12
+                  items:
+                    type: string
+                    maxLength: 80
+      responses:
+        "200":
+          description: Research answer, citations, and routing metadata
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [answer, citations, model, usedWebSearch, catalogCacheHit]
+                properties:
+                  answer:
+                    type: string
+                  citations:
+                    type: array
+                    items:
+                      type: object
+                      required: [title, url]
+                      properties:
+                        title: { type: string }
+                        url: { type: string, format: uri }
+                  model: { type: string }
+                  usedWebSearch: { type: boolean }
+                  catalogCacheHit: { type: boolean }
+        "400":
+          description: Invalid question
+        "429":
+          description: Too many requests
+        "502":
+          description: Research provider unavailable
 components:
   schemas:
     HealthStatus:

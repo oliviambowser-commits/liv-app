@@ -68,3 +68,28 @@ export async function getCatalogProduct(id: string): Promise<CatalogProduct> {
   const result = (await response.json()) as { product: CatalogProduct };
   return result.product;
 }
+
+export type AskCitation = { title: string; url: string };
+export type AskResult = {
+  answer: string;
+  citations: AskCitation[];
+  model: string;
+  usedWebSearch: boolean;
+  catalogCacheHit: boolean;
+};
+
+export async function askLiv(payload: {
+  question: string;
+  productId?: string;
+  history: { role: "user" | "assistant"; content: string }[];
+  preferences: string[];
+}): Promise<AskResult> {
+  const response = await fetch(apiUrl("/liv/ask"), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(result.message ?? "Liv could not complete this research.");
+  return result as AskResult;
+}

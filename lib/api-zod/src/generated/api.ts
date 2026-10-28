@@ -75,3 +75,42 @@ export const GetCatalogProductResponse = zod.object({
 })
 
 
+/**
+ * @summary Ask Liv using catalog evidence and optional web research
+ */
+export const askLivBodyQuestionMax = 1200;
+
+export const askLivBodyProductIdMax = 40;
+
+export const askLivBodyHistoryItemContentMax = 1200;
+
+export const askLivBodyHistoryMax = 8;
+
+export const askLivBodyPreferencesItemMax = 80;
+
+export const askLivBodyPreferencesMax = 12;
+
+
+
+export const AskLivBody = zod.object({
+  "question": zod.string().min(1).max(askLivBodyQuestionMax),
+  "productId": zod.string().max(askLivBodyProductIdMax).optional(),
+  "history": zod.array(zod.object({
+  "role": zod.enum(['user', 'assistant']),
+  "content": zod.string().max(askLivBodyHistoryItemContentMax)
+})).max(askLivBodyHistoryMax).optional(),
+  "preferences": zod.array(zod.string().max(askLivBodyPreferencesItemMax)).max(askLivBodyPreferencesMax).optional()
+})
+
+export const AskLivResponse = zod.object({
+  "answer": zod.string(),
+  "citations": zod.array(zod.object({
+  "title": zod.string(),
+  "url": zod.string().url()
+})),
+  "model": zod.string(),
+  "usedWebSearch": zod.boolean(),
+  "catalogCacheHit": zod.boolean()
+})
+
+

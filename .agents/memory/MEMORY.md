@@ -1,0 +1,1 @@
+- [Liv research source policy](liv-research-source-policy.md) — Keep web results ephemeral and restrict product claims to approved sources; cache only facts with recorded reuse rights.

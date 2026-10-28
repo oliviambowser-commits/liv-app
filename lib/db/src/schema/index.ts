@@ -1,4 +1,4 @@
-import { integer, jsonb, pgTable, real, text, timestamp } from "drizzle-orm/pg-core";
+import { boolean, integer, jsonb, pgTable, real, serial, text, timestamp } from "drizzle-orm/pg-core";
 
 export type LivSource = {
   label: string;
@@ -47,6 +47,22 @@ export const livProducts = pgTable("liv_products", {
   communityReviewCount: integer("community_review_count"),
   communityRatingSource: text("community_rating_source"),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const aiUsageEvents = pgTable("ai_usage_events", {
+  id: serial("id").primaryKey(),
+  provider: text("provider").notNull(),
+  model: text("model").notNull(),
+  route: text("route").notNull(),
+  inputTokens: integer("input_tokens").notNull().default(0),
+  outputTokens: integer("output_tokens").notNull().default(0),
+  webSearchCalls: integer("web_search_calls").notNull().default(0),
+  latencyMs: integer("latency_ms").notNull(),
+  estimatedCostUsd: real("estimated_cost_usd").notNull().default(0),
+  catalogCacheHit: boolean("catalog_cache_hit").notNull().default(false),
+  success: boolean("success").notNull(),
+  errorCategory: text("error_category"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
 export type LivProduct = typeof livProducts.$inferSelect;

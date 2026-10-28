@@ -1,11 +1,11 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Image, Keyboard, Linking, Modal, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { DIMENSIONS, Product, PRODUCTS, useLiv } from '../state/LivContext';
 import colors from '../constants/colors';
-import { CatalogProduct, getCatalogProduct, searchCatalog } from '../lib/catalog';
+import { AskCitation, CatalogProduct, askLiv, getCatalogProduct, searchCatalog } from '../lib/catalog';
 
 const C = colors.light;
 const display = 'Manrope_700Bold';
@@ -163,7 +163,7 @@ export function ProfileScreen() {
     <View style={s.profileHero}><View style={s.profileAvatar}><Txt style={s.profileInitial}>L</Txt></View><View style={{ flex: 1 }}><Txt style={s.profileName}>A more personal Liv</Txt><Txt style={s.productMeta}>Preferences stay on this device</Txt></View><Feather name="settings" size={19} color={C.primary}/></View>
     <View style={s.statsRow}><Stat value={String(recent.length)} label="Viewed"/><Stat value={String(saved.length)} label="Saved"/><Stat value={String(prefs.priorities.length)} label="Priorities"/></View>
     <SectionTitle>What matters to you</SectionTitle><View style={s.preferenceCard}><Txt style={s.preferenceLabel}>Interests</Txt><View style={s.wrapChips}>{(prefs.interests.length ? prefs.interests : ['Not set']).map((v) => <View key={v} style={s.prefChip}><Txt style={s.prefChipText}>{v}</Txt></View>)}</View><Txt style={s.preferenceLabel}>Priorities</Txt><View style={s.wrapChips}>{(prefs.priorities.length ? prefs.priorities : ['Not set']).map((v) => <View key={v} style={s.prefChip}><Txt style={s.prefChipText}>{v}</Txt></View>)}</View><Pressable onPress={() => router.push('/onboarding')} style={s.editRow}><Txt style={s.smallLink}>Edit preferences</Txt><Feather name="arrow-right" size={15} color={C.primary}/></Pressable></View>
-    <SectionTitle>Privacy, your way</SectionTitle><View style={s.consentCard}><View style={{ flex: 1 }}><Txt style={s.preferenceLabel}>Remember my preferences</Txt><Txt style={s.consentCopy}>Separate, optional permission. Your saved items stay local either way.</Txt></View><Switch value={prefs.memoryConsent} onValueChange={(value) => setPrefs({ ...prefs, memoryConsent: value })} trackColor={{ false: C.border, true: C.sage }} thumbColor={C.card} accessibilityLabel="Allow Liv to remember preferences"/></View>
+    <SectionTitle>Privacy, your way</SectionTitle><View style={s.consentCard}><View style={{ flex: 1 }}><Txt style={s.preferenceLabel}>Use preferences with Ask Liv</Txt><Txt style={s.consentCopy}>Optional. When enabled, selected preferences are sent to OpenAI for personalized replies. Saved items stay on this device.</Txt></View><Switch value={prefs.memoryConsent} onValueChange={(value) => setPrefs({ ...prefs, memoryConsent: value })} trackColor={{ false: C.border, true: C.sage }} thumbColor={C.card} accessibilityLabel="Allow Liv to use preferences with Ask Liv"/></View>
     <SectionTitle>Your Liv</SectionTitle><MenuRow icon="bookmark" title="Saved items & lists" detail={`${saved.length} saved products`} onPress={() => router.push('/saved')}/><MenuRow icon="clock" title="Recently viewed" detail={`${recent.length} sample profiles`} onPress={() => router.push('/saved?tab=history')}/><MenuRow icon="columns" title="Compare products" detail="Choose exactly two" onPress={() => router.push('/compare')}/><MenuRow icon="info" title="About this demo" detail="Local sample data only" onPress={() => Alert.alert('Liv · M0 demo', 'All scores, products, reviews, and ingredient summaries are illustrative sample content. No live lookup or sourced research is used.')}/>
   </Page>;
 }
@@ -184,7 +184,7 @@ export function OnboardingScreen() {
     <View style={s.pageIntro}><Txt style={s.eyebrow}>A SMALL START · {step + 1} OF 3</Txt><Txt style={s.pageTitle}>{step === 0 ? 'What do you shop for?' : step === 1 ? 'What matters most?' : 'Anything else to know?'}</Txt><Txt style={s.introCopy}>{step === 2 ? 'Optional context can help frame a useful explanation. This is not medical advice.' : 'Choose what feels relevant. You can revisit or change this whenever you like.'}</Txt></View>
     {step === 0 && <View style={s.wrapChips}>{interests.map((x) => <Chip key={x} label={x} active={interest.includes(x)} onPress={() => toggle(interest, setInterest, x)}/>)}</View>}
     {step === 1 && <View style={s.wrapChips}>{priorities.map((x) => <Chip key={x} label={x} active={priority.includes(x)} onPress={() => toggle(priority, setPriority, x)}/>)}</View>}
-    {step === 2 && <><Txt style={s.inputLabel}>Optional restrictions or sensitivities</Txt><View style={s.wrapChips}>{['Fragrance', 'Sensitive skin', 'Avoid certain ingredients'].map((x) => <Chip key={x} label={x} active={restriction.includes(x)} onPress={() => toggle(restriction, setRestriction, x)}/>)}</View><TextInput value={note} onChangeText={setNote} placeholder="Anything else? (optional)" placeholderTextColor={C.mutedForeground} style={[s.formInput, { minHeight: 90 }]} multiline textAlignVertical="top" accessibilityLabel="Optional preference note"/><View style={s.consentCard}><View style={{ flex: 1 }}><Txt style={s.preferenceLabel}>Let Liv remember preferences</Txt><Txt style={s.consentCopy}>Optional and separate from sharing. Stored locally on this device.</Txt></View><Switch value={prefs.memoryConsent} onValueChange={(v) => setPrefs({ ...prefs, memoryConsent: v })} trackColor={{ false: C.border, true: C.sage }} thumbColor={C.card} accessibilityLabel="Opt in to remembering preferences"/></View></>}
+    {step === 2 && <><Txt style={s.inputLabel}>Optional restrictions or sensitivities</Txt><View style={s.wrapChips}>{['Fragrance', 'Sensitive skin', 'Avoid certain ingredients'].map((x) => <Chip key={x} label={x} active={restriction.includes(x)} onPress={() => toggle(restriction, setRestriction, x)}/>)}</View><TextInput value={note} onChangeText={setNote} placeholder="Anything else? (optional)" placeholderTextColor={C.mutedForeground} style={[s.formInput, { minHeight: 90 }]} multiline textAlignVertical="top" accessibilityLabel="Optional preference note"/><View style={s.consentCard}><View style={{ flex: 1 }}><Txt style={s.preferenceLabel}>Use preferences with Ask Liv</Txt><Txt style={s.consentCopy}>Optional. When enabled, selected preferences are sent to OpenAI for personalized replies. The note above is never sent.</Txt></View><Switch value={prefs.memoryConsent} onValueChange={(v) => setPrefs({ ...prefs, memoryConsent: v })} trackColor={{ false: C.border, true: C.sage }} thumbColor={C.card} accessibilityLabel="Allow Liv to use preferences with Ask Liv"/></View></>}
     <View style={s.onboardingBottom}>{step < 2 ? <><Button title="Continue" onPress={() => setStep(step + 1)}/><Pressable onPress={() => setStep(step + 1)} style={s.skipBtn}><Txt style={s.smallLink}>Skip this question</Txt></Pressable></> : <Button title="Save my preferences" onPress={finish}/>}<Txt style={s.privacyFoot}>You’re in control. Preferences can be edited or cleared at any time.</Txt></View>
   </Page>;
 }
@@ -245,26 +245,69 @@ function SourcedProductDetail({ id }: { id: string }) {
 
 export function AskScreen() {
   const router = useRouter(); const params = useLocalSearchParams<{ q?: string; product?: string }>();
-  const product = params.product ? PRODUCTS.find((p) => p.id === params.product) : undefined;
-  const [question, setQuestion] = useState(params.q ?? '');
-  const [messages, setMessages] = useState<{ role: 'user' | 'liv'; text: string }[]>(params.q ? [{ role: 'user', text: params.q }, { role: 'liv', text: responseFor(params.q, product) }] : []);
-  const send = (text = question) => { const clean = text.trim(); if (!clean) return; setMessages((prev) => [...prev, { role: 'user', text: clean }, { role: 'liv', text: responseFor(clean, product) }]); setQuestion(''); Keyboard.dismiss(); };
+  const { prefs } = useLiv();
+  const demoProduct = params.product ? PRODUCTS.find((p) => p.id === params.product) : undefined;
+  const [sourcedProduct, setSourcedProduct] = useState<CatalogProduct | null>(null);
+  const [question, setQuestion] = useState('');
+  const [messages, setMessages] = useState<{ role: 'user' | 'assistant'; text: string; citations?: AskCitation[]; model?: string; usedWebSearch?: boolean }[]>([]);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const initialSent = useRef(false);
+  useEffect(() => {
+    if (!params.product || demoProduct) return;
+    let active = true;
+    getCatalogProduct(params.product).then((value) => { if (active) setSourcedProduct(value); }).catch(() => {});
+    return () => { active = false; };
+  }, [params.product, demoProduct]);
+  const send = async (text = question) => {
+    const clean = text.trim();
+    if (!clean || busy) return;
+    const userText = demoProduct ? `${clean} (about ${demoProduct.brand} ${demoProduct.name})` : clean;
+    const history = messages.map((message) => ({ role: message.role, content: message.text }));
+    setMessages((previous) => [...previous, { role: 'user', text: clean }]);
+    setQuestion('');
+    setError('');
+    setBusy(true);
+    Keyboard.dismiss();
+    try {
+      const result = await askLiv({
+        question: userText,
+        productId: sourcedProduct?.id,
+        history,
+        preferences: prefs.memoryConsent
+          ? [...prefs.interests, ...prefs.priorities, ...prefs.restrictions].slice(0, 12)
+          : [],
+      });
+      setMessages((previous) => [...previous, {
+        role: 'assistant',
+        text: result.answer,
+        citations: result.citations,
+        model: result.model,
+        usedWebSearch: result.usedWebSearch,
+      }]);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Liv could not complete this research.');
+    } finally {
+      setBusy(false);
+    }
+  };
+  useEffect(() => {
+    if (params.q && !initialSent.current) {
+      initialSent.current = true;
+      void send(params.q);
+    }
+  }, [params.q]);
+  const activeProduct = demoProduct ?? sourcedProduct;
   const prompts = ['Is this ingredient safe?', 'What should I compare?', 'What’s still unknown?'];
-  return <Page><Header title="Ask Liv" back action={undefined}/><View style={s.askWelcome}><View style={s.askBrandMark}><Txt style={s.askBrandText}>liv.</Txt></View><Txt style={s.pageTitle}>Curiosity, meet clarity.</Txt><Txt style={s.introCopy}>Ask about an ingredient, product, or trade-off. Liv’s reply is a scripted local demo—not research or medical advice.</Txt></View>
-    {product && <Pressable onPress={() => router.push(`/product/${product.id}`)} style={s.contextProduct}><Image source={product.image} style={s.contextImage}/><View style={{ flex: 1 }}><Txt style={s.productMeta}>ASKING ABOUT</Txt><Txt style={s.postProductName}>{product.brand} · {product.name}</Txt></View><Feather name="arrow-up-right" size={17} color={C.primary}/></Pressable>}
-    <DemoTag label="SCRIPTED LOCAL DEMO"/>
-    {messages.length === 0 ? <><Txt style={s.sectionTitle}>A few things you could ask</Txt>{prompts.map((p) => <Pressable key={p} onPress={() => send(p)} style={s.suggestion}><Txt style={s.suggestionText}>{p}</Txt><Feather name="arrow-up-right" size={15} color={C.primary}/></Pressable>)}</> : messages.map((m, idx) => <View key={`${idx}-${m.role}`} style={[s.message, m.role === 'user' ? s.userMessage : s.livMessage]}><Txt style={[s.messageRole, m.role === 'user' && { color: C.primaryForeground }]}>{m.role === 'user' ? 'YOU · DEMO MESSAGE' : 'LIV · SCRIPTED DEMO RESPONSE'}</Txt><Txt style={[s.messageText, m.role === 'user' && { color: C.primaryForeground }]}>{m.text}</Txt>{m.role === 'liv' && product && <Pressable onPress={() => router.push(`/product/${product.id}`)}><Txt style={s.smallLink}>View product breakdown →</Txt></Pressable>}</View>)}
+  return <Page><Header title="Ask Liv" back action={undefined}/><View style={s.askWelcome}><View style={s.askBrandMark}><Txt style={s.askBrandText}>liv.</Txt></View><Txt style={s.pageTitle}>Curiosity, meet clarity.</Txt><Txt style={s.introCopy}>Ask about a product, ingredient, or trade-off. Liv researches available sources and explains what remains unknown.</Txt></View>
+    {activeProduct && <Pressable onPress={() => router.push(`/product/${activeProduct.id}`)} style={s.contextProduct}><View style={s.contextImage}/><View style={{ flex: 1 }}><Txt style={s.productMeta}>ASKING ABOUT</Txt><Txt style={s.postProductName}>{activeProduct.brand} · {activeProduct.name}</Txt></View><Feather name="arrow-up-right" size={17} color={C.primary}/></Pressable>}
+    {messages.length === 0 ? <><Txt style={s.sectionTitle}>A few things you could ask</Txt>{prompts.map((p) => <Pressable key={p} onPress={() => void send(p)} style={s.suggestion}><Txt style={s.suggestionText}>{p}</Txt><Feather name="arrow-up-right" size={15} color={C.primary}/></Pressable>)}</> : messages.map((m, idx) => <View key={`${idx}-${m.role}`} style={[s.message, m.role === 'user' ? s.userMessage : s.livMessage]}><Txt style={[s.messageRole, m.role === 'user' && { color: C.primaryForeground }]}>{m.role === 'user' ? 'YOU' : `LIV${m.model ? ` · ${m.model}` : ''}${m.usedWebSearch ? ' · WEB RESEARCH' : ''}`}</Txt><Txt style={[s.messageText, m.role === 'user' && { color: C.primaryForeground }]}>{m.text}</Txt>{m.citations?.map((citation) => <Pressable key={citation.url} onPress={() => Linking.openURL(citation.url)}><Txt style={s.smallLink}>{citation.title} ↗</Txt></Pressable>)}</View>)}
+    {busy && <View style={s.livMessage}><Txt style={s.messageRole}>LIV IS RESEARCHING</Txt><Txt style={s.messageText}>Checking product facts and sources…</Txt></View>}
+    {!!error && <View style={s.unknownCard}><Feather name="alert-circle" size={17} color={C.primary}/><Txt style={[s.consentCopy,{flex:1}]}>{error}</Txt></View>}
     {messages.length > 0 && <View style={[s.wrapChips, { marginTop: 8 }]}>{prompts.map((p) => <Chip key={p} label={p} onPress={() => send(p)}/>)}</View>}
-    <View style={s.chatComposer}><TextInput value={question} onChangeText={setQuestion} placeholder="Ask a question…" placeholderTextColor={C.mutedForeground} style={s.chatInput} multiline accessibilityLabel="Write a question for Liv"/><Pressable onPress={() => send()} accessibilityRole="button" accessibilityLabel="Send message" style={[s.sendBtn, !question.trim() && s.sendDisabled]}><Feather name="arrow-up" size={19} color={C.primaryForeground}/></Pressable></View>
-    <Txt style={s.subtleDisclaimer}>Responses are rule-based examples. No AI, internet, or health assessment is used.</Txt>
+    <View style={s.chatComposer}><TextInput value={question} onChangeText={setQuestion} placeholder="Ask a question…" placeholderTextColor={C.mutedForeground} style={s.chatInput} multiline accessibilityLabel="Write a question for Liv"/><Pressable onPress={() => void send()} disabled={busy} accessibilityRole="button" accessibilityLabel="Send message" style={[s.sendBtn, (!question.trim() || busy) && s.sendDisabled]}><Feather name="arrow-up" size={19} color={C.primaryForeground}/></Pressable></View>
+    <Txt style={s.subtleDisclaimer}>AI responses may be incomplete. Product facts are linked to sources; this is not medical advice. Preferences are shared with the AI only when preference memory is enabled.</Txt>
   </Page>;
-}
-function responseFor(question: string, product?: Product) {
-  const q = question.toLowerCase();
-  if (q.includes('safe') || q.includes('reaction')) return `“Safe” depends on the person, the formula, and how it is used. This local demo can’t establish universal safety or predict an individual reaction. ${product ? `For ${product.name}, the sample profile lists ${product.ingredients[0]?.name ?? 'ingredient notes'}; concentrations and your personal context are unknown.` : 'We can look at an ingredient’s general role and clearly name what remains unknown.'}`;
-  if (q.includes('compare')) return 'A useful comparison starts with what matters to you: ingredient profile, expected use, transparency, community context, or price. Each dimension stays separate here—there is no combined Liv score.';
-  if (q.includes('unknown')) return `${product ? `${product.name}: ` : ''}This demo does not verify current packaging, ingredient concentrations, product batches, or individual results. Its summaries and figures are sample content only.`;
-  return `${product ? `About ${product.name}: ` : ''}Here’s a starting point, not a verdict: review the listed ingredient notes alongside the product’s intended use and your own preferences. This scripted sample has no sourced research; several details may be unknown.`;
 }
 
 export function CompareScreen() {

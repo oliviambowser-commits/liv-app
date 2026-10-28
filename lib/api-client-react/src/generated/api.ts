@@ -6,16 +6,22 @@
  * OpenAPI spec version: 0.1.0
  */
 import {
+  useMutation,
   useQuery
 } from '@tanstack/react-query';
 import type {
+  MutationFunction,
   QueryFunction,
   QueryKey,
+  UseMutationOptions,
+  UseMutationResult,
   UseQueryOptions,
   UseQueryResult
 } from '@tanstack/react-query';
 
 import type {
+  AskLiv200,
+  AskLivBody,
   GetCatalogProduct200,
   HealthStatus,
   SearchCatalogProducts200,
@@ -23,7 +29,7 @@ import type {
 } from './api.schemas';
 
 import { customFetch } from '../custom-fetch';
-import type { ErrorType } from '../custom-fetch';
+import type { ErrorType , BodyType } from '../custom-fetch';
 
 type AwaitedInput<T> = PromiseLike<T> | T;
 
@@ -287,4 +293,92 @@ export function useGetCatalogProduct<TData = Awaited<ReturnType<typeof getCatalo
 
 
 
+
+export const getAskLivUrl = () => {
+
+
+
+
+  return `/api/liv/ask`
+}
+
+/**
+ * @summary Ask Liv using catalog evidence and optional web research
+ */
+export const askLiv = async (askLivBody: AskLivBody, options?: Parameters<typeof customFetch>[1]): Promise<AskLiv200> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<AskLiv200>(getAskLivUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(askLivBody)
+  }
+);}
+
+
+
+
+
+export const getAskLivMutationKey = () => ['askLiv'] as const;
+
+export const getAskLivMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof askLiv>>, TError,AskLivMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof askLiv>>, TError,AskLivMutationVariables, TContext> => {
+
+const mutationKey = getAskLivMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof askLiv>>, AskLivMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  askLiv(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AskLivMutationResult = NonNullable<Awaited<ReturnType<typeof askLiv>>>
+    export type AskLivMutationBody = BodyType<AskLivBody>
+    export type AskLivMutationError = ErrorType<void>
+    export type AskLivMutationVariables = {data: BodyType<AskLivBody>}
+
+    /**
+ * @summary Ask Liv using catalog evidence and optional web research
+ */
+export const useAskLiv = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof askLiv>>, TError,AskLivMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof askLiv>>,
+        TError,
+        AskLivMutationVariables,
+        TContext
+      > => {
+      return useMutation(getAskLivMutationOptions(options));
+    }
 

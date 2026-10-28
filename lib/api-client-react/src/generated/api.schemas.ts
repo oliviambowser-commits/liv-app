@@ -53,3 +53,47 @@ export type GetCatalogProduct200 = {
   product: LivProduct;
 };
 
+export type AskLivBodyHistoryItemRole = typeof AskLivBodyHistoryItemRole[keyof typeof AskLivBodyHistoryItemRole];
+
+
+export const AskLivBodyHistoryItemRole = {
+  user: 'user',
+  assistant: 'assistant',
+} as const;
+
+export type AskLivBodyHistoryItem = {
+  role: AskLivBodyHistoryItemRole;
+  /** @maxLength 1200 */
+  content: string;
+};
+
+export type AskLivBody = {
+  /**
+     * @minLength 1
+     * @maxLength 1200
+     */
+  question: string;
+  /** @maxLength 40 */
+  productId?: string;
+  /** @maxItems 8 */
+  history?: AskLivBodyHistoryItem[];
+  /**
+     * @maxItems 12
+     * @items.maxLength 80
+     */
+  preferences?: string[];
+};
+
+export type AskLiv200CitationsItem = {
+  title: string;
+  url: string;
+};
+
+export type AskLiv200 = {
+  answer: string;
+  citations: AskLiv200CitationsItem[];
+  model: string;
+  usedWebSearch: boolean;
+  catalogCacheHit: boolean;
+};
+
