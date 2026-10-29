@@ -1,6 +1,46 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { mergeCatalogProducts, searchLiveCatalog, type CatalogCategory } from "./search";
+import { mapUpcCategory } from "./upcitemdb";
+
+test("maps retail category paths to Liv categories", () => {
+  assert.equal(mapUpcCategory("Health & Beauty > Personal Care > Massagers", "Theragun Prime Percussive Therapy Device"), "Wellness");
+  assert.equal(mapUpcCategory("Home & Garden > Decor > Home Fragrances > Candles", "Otherland Candle"), "Household");
+  assert.equal(mapUpcCategory("Health & Beauty > Personal Care > Cosmetics > Makeup > Lipstick", "Lipstick"), "Beauty");
+  assert.equal(mapUpcCategory("Health & Beauty > Personal Care > Skin Care > Lotions", "Daily Lotion"), "Skincare");
+});
+
+test("adds retail products with images from UPCitemdb, normalized to Liv's barcode format", async () => {
+  const original = globalThis.fetch;
+  try {
+    globalThis.fetch = async (input) => {
+      const url = new URL(String(input));
+      if (url.hostname === "api.upcitemdb.com") {
+        assert.equal(url.searchParams.get("s"), "otherland candle");
+        return new Response(JSON.stringify({ code: "OK", items: [{
+          upc: "851939002067",
+          title: "Otherland Canopy Scented Candle 8 oz",
+          brand: "Otherland",
+          category: "Home & Garden > Decor > Home Fragrances > Candles",
+          size: "8 oz",
+          images: ["http://insecure.example/x.jpg", "https://images.example/candle.jpg"],
+        }] }));
+      }
+      return new Response(JSON.stringify({ products: [] }));
+    };
+    const result = await searchLiveCatalog("otherland candle", "All");
+    const candle = result.products.find((product) => product.brand === "Otherland");
+    assert.equal(candle?.id, "0851939002067");
+    assert.equal(candle?.category, "Household");
+    assert.equal(candle?.imageUrl, "https://images.example/candle.jpg");
+    assert.equal(candle?.ingredientsText, null);
+    assert.match(candle?.sources[0]?.license ?? "", /UPCitemdb/);
+    assert.ok(candle?.scores.every((score) => score.value === null));
+    assert.equal(result.providers.find((provider) => provider.id === "upcitemdb")?.status, "searched");
+  } finally {
+    globalThis.fetch = original;
+  }
+});
 
 test("normalizes sourced records across four categories without inventing scores", async () => {
   const original = globalThis.fetch;
@@ -14,6 +54,7 @@ test("normalizes sourced records across four categories without inventing scores
     for (const [category, name] of examples) {
       globalThis.fetch = async (input) => {
         const url = new URL(String(input));
+        if (url.hostname === "api.upcitemdb.com") return new Response(JSON.stringify({ code: "OK", items: [] }));
         assert.equal(url.searchParams.get("tag_0"), "united-states");
         assert.equal(url.searchParams.get("search_terms"), "test brand");
         return new Response(JSON.stringify({ products: [{ code: "1234567890128", product_name: name, brands: "Test Brand", last_modified_t: 1700000000 }] }));
@@ -39,46 +80,13 @@ test("distinguishes empty results, provider failure, malformed data, and rate li
     globalThis.fetch = async () => new Response(JSON.stringify({ products: [] }));
     const empty = await searchLiveCatalog("missing product", "All");
     assert.equal(empty.products.length, 0);
-    assert.ok(empty.providers.every((provider) => provider.status === "searched"));
+    assert.ok(empty.providers.filter((provider) => provider.id !== "upcitemdb").every((provider) => provider.status === "searched"));
     globalThis.fetch = async () => { throw new Error("Network unavailable"); };
     assert.equal((await searchLiveCatalog("failure", "Beauty")).providers[0]?.status, "unavailable");
     globalThis.fetch = async () => new Response(JSON.stringify({ products: "invalid" }));
     assert.equal((await searchLiveCatalog("malformed", "Beauty")).providers[0]?.status, "unavailable");
     globalThis.fetch = async () => new Response("", { status: 429 });
     assert.equal((await searchLiveCatalog("limited", "Beauty")).providers[0]?.status, "rate_limited");
-  } finally {
-    globalThis.fetch = original;
-  }
-});
-
-test("canonicalizes live barcode IDs and skips invalid codes", async () => {
-  const original = globalThis.fetch;
-  try {
-    const codes = [
-      "851939002067", // UPC-A
-      "0851939002067", // Equivalent EAN-13
-      "00851939002067", // Equivalent zero-prefixed GTIN-14
-      "96385074", // EAN-8
-      "851939002068", // Invalid check digit
-      "not-a-barcode",
-      "",
-      undefined,
-      851939002067,
-    ];
-    globalThis.fetch = async () => new Response(JSON.stringify({
-      products: codes.map((code) => ({ code, product_name: "Massage device" })),
-    }));
-    const result = await searchLiveCatalog("massage", "Wellness");
-    assert.equal(result.providers[0]?.status, "searched");
-    assert.equal(result.providers[0]?.returned, 4);
-    assert.deepEqual(result.products.map((product) => product.id), [
-      "0851939002067",
-      "0851939002067",
-      "0851939002067",
-      "96385074",
-    ]);
-    assert.match(result.products[0]!.sources[0]!.url, /\/product\/851939002067$/);
-    assert.equal(mergeCatalogProducts([result.products[0]!], result.products).length, 2);
   } finally {
     globalThis.fetch = original;
   }

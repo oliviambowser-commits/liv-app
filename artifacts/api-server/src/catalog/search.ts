@@ -1,12 +1,13 @@
 import type { LivProduct, LivSource } from "@workspace/db";
-import { parseBarcode } from "./barcode";
 import { noScores } from "./seed";
+import { parseBarcode } from "./gtin";
+import { searchUpcItemdb } from "./upcitemdb";
 
 export const CATALOG_CATEGORIES = ["All", "Skincare", "Beauty", "Wellness", "Household"] as const;
 export type CatalogCategory = (typeof CATALOG_CATEGORIES)[number];
 
 export type CatalogProviderStatus = {
-  id: "open_beauty_facts" | "open_products_facts";
+  id: "open_beauty_facts" | "open_products_facts" | "upcitemdb";
   label: string;
   status: "searched" | "rate_limited" | "unavailable" | "not_applicable";
   returned: number;
@@ -18,7 +19,7 @@ export type LiveCatalogSearch = {
 };
 
 type Provider = {
-  id: CatalogProviderStatus["id"];
+  id: Exclude<CatalogProviderStatus["id"], "upcitemdb">;
   label: string;
   origin: string;
   license: string;
@@ -31,6 +32,7 @@ type ProviderProduct = {
   categories?: string;
   quantity?: string;
   ingredients_text?: string;
+  image_front_url?: string;
   last_modified_t?: number;
 };
 
@@ -53,19 +55,27 @@ const providers: Provider[] = [
 
 // OFF-family search endpoints limit search requests to 10/minute/IP. Keep
 // headroom for concurrent users and other services sharing this server IP.
-const providerWindows = new Map<Provider["id"], SearchWindow>();
+const providerWindows = new Map<CatalogProviderStatus["id"], SearchWindow>();
 const MAX_PROVIDER_SEARCHES_PER_MINUTE = 8;
 const USER_AGENT = process.env["OPEN_FACTS_USER_AGENT"] ?? "Liv/0.1 (product research app)";
-const FIELDS = "code,product_name,brands,categories,quantity,ingredients_text,last_modified_t";
+const FIELDS = "code,product_name,brands,categories,quantity,ingredients_text,image_front_url,last_modified_t";
+// UPCitemdb free tier allows 20 searches a day; keep a per-minute guard too.
+const UPC_SEARCHES_PER_MINUTE = process.env["UPCITEMDB_API_KEY"] ? 20 : 3;
 
-function takeProviderSlot(id: Provider["id"]): boolean {
+/** Liv stores barcodes in canonical 13-digit form so duplicates merge. */
+export function canonicalId(code: string): string | null {
+  const parsed = parseBarcode(code);
+  return typeof parsed === "string" ? null : parsed.canonical;
+}
+
+function takeProviderSlot(id: CatalogProviderStatus["id"], limit = MAX_PROVIDER_SEARCHES_PER_MINUTE): boolean {
   const now = Date.now();
   const previous = providerWindows.get(id);
   if (!previous || now - previous.startedAt >= 60_000) {
     providerWindows.set(id, { startedAt: now, requests: 1 });
     return true;
   }
-  if (previous.requests >= MAX_PROVIDER_SEARCHES_PER_MINUTE) return false;
+  if (previous.requests >= limit) return false;
   previous.requests += 1;
   return true;
 }
@@ -87,12 +97,10 @@ function categorize(item: ProviderProduct, provider: Provider["id"]): string {
 }
 
 function toLivProduct(item: ProviderProduct, provider: Provider): LivProduct | null {
-  const code = typeof item.code === "string" ? item.code.trim() : "";
-  const barcode = parseBarcode(code);
+  const id = canonicalId(item.code?.trim() ?? "");
   const name = item.product_name?.trim();
-  if (typeof barcode === "string" || !name) return null;
-  const id = barcode.canonical;
-  const sourceUrl = `${provider.origin}/product/${encodeURIComponent(code)}`;
+  if (!id || !name) return null;
+  const sourceUrl = `${provider.origin}/product/${encodeURIComponent(id)}`;
   const source: LivSource = {
     label: `${provider.label} product record`,
     url: sourceUrl,
@@ -119,6 +127,8 @@ function toLivProduct(item: ProviderProduct, provider: Provider): LivProduct | n
     communityRating: null,
     communityReviewCount: null,
     communityRatingSource: null,
+    imageUrl: item.image_front_url?.startsWith("https://") ? item.image_front_url : null,
+    imageAttribution: item.image_front_url?.startsWith("https://") ? `Image from ${provider.label} contributors, CC BY-SA` : null,
     updatedAt: new Date(),
   };
 }
@@ -180,15 +190,29 @@ async function searchProvider(
   }
 }
 
+async function searchRetail(query: string, page: number): Promise<{ products: LivProduct[]; status: CatalogProviderStatus }> {
+  const label = "UPCitemdb retail database";
+  if (!takeProviderSlot("upcitemdb", UPC_SEARCHES_PER_MINUTE)) {
+    return { products: [], status: { id: "upcitemdb", label, status: "rate_limited", returned: 0 } };
+  }
+  const result = await searchUpcItemdb(query, page, canonicalId);
+  const status = result.status === "ok" ? "searched" : result.status;
+  return { products: result.products, status: { id: "upcitemdb", label, status, returned: result.products.length } };
+}
+
 export async function searchLiveCatalog(query: string, category: CatalogCategory, page = 1): Promise<LiveCatalogSearch> {
   const relevantProviders = providersFor(category);
-  const results = await Promise.all(relevantProviders.map((provider) => searchProvider(provider, query, page)));
-  const products = results.flatMap((result) => result.products)
+  const [results, retail] = await Promise.all([
+    Promise.all(relevantProviders.map((provider) => searchProvider(provider, query, page))),
+    searchRetail(query, page),
+  ]);
+  const products = [...results.flatMap((result) => result.products), ...retail.products]
     .filter((product) => category === "All" || product.category === category);
   return {
     products,
     providers: [
       ...results.map((result) => result.status),
+      retail.status,
       ...providers
         .filter((provider) => !relevantProviders.some((chosen) => chosen.id === provider.id))
         .map((provider) => ({

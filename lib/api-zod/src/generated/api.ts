@@ -51,10 +51,12 @@ export const SearchCatalogProductsResponse = zod.object({
   "communityRating": zod.number().nullish(),
   "communityReviewCount": zod.number().int().nullish(),
   "communityRatingSource": zod.string().nullish(),
+  "imageUrl": zod.string().nullish().describe('Product image URL from a source that permits display; null when none is available'),
+  "imageAttribution": zod.string().nullish(),
   "updatedAt": zod.coerce.date().optional()
 })),
   "providers": zod.array(zod.object({
-  "id": zod.enum(['open_beauty_facts', 'open_products_facts']),
+  "id": zod.enum(['open_beauty_facts', 'open_products_facts', 'upcitemdb']),
   "label": zod.string(),
   "status": zod.enum(['searched', 'rate_limited', 'unavailable', 'not_applicable']),
   "returned": zod.number().int()
@@ -85,6 +87,8 @@ export const GetCatalogProductResponse = zod.object({
   "communityRating": zod.number().nullish(),
   "communityReviewCount": zod.number().int().nullish(),
   "communityRatingSource": zod.string().nullish(),
+  "imageUrl": zod.string().nullish().describe('Product image URL from a source that permits display; null when none is available'),
+  "imageAttribution": zod.string().nullish(),
   "updatedAt": zod.coerce.date().optional()
 })
 })

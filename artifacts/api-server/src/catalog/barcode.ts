@@ -2,35 +2,11 @@ import { inArray } from "drizzle-orm";
 import { db, livProducts, type LivProduct, type LivSource } from "@workspace/db";
 import { logger } from "../lib/logger";
 import { noScores } from "./seed";
+import { lookupUpcItemdb } from "./upcitemdb";
 
-export type ParsedBarcode = { canonical: string; candidates: string[] };
+import { parseBarcode, type ParsedBarcode } from "./gtin";
 
-/**
- * Normalizes a scanned or typed barcode.
- * Phones often read US products as 12-digit UPC-A ("851939002067") while
- * databases store the 13-digit EAN form ("0851939002067"). We store the
- * 13-digit form and search for both.
- */
-export function parseBarcode(raw: string): ParsedBarcode | "invalid_format" | "invalid_check_digit" {
-  const digits = raw.replace(/\D/g, "");
-  if (![8, 12, 13, 14].includes(digits.length)) return "invalid_format";
-  if (!hasValidCheckDigit(digits)) return "invalid_check_digit";
-  let canonical = digits;
-  if (digits.length === 12) canonical = `0${digits}`;
-  if (digits.length === 14 && digits.startsWith("0")) canonical = digits.slice(1);
-  const candidates = new Set([digits, canonical]);
-  if (canonical.length === 13 && canonical.startsWith("0")) candidates.add(canonical.slice(1));
-  return { canonical, candidates: [...candidates] };
-}
-
-function hasValidCheckDigit(code: string) {
-  const digits = code.split("").map(Number);
-  const check = digits.pop();
-  const sum = digits
-    .reverse()
-    .reduce((total, digit, index) => total + digit * (index % 2 === 0 ? 3 : 1), 0);
-  return (10 - (sum % 10)) % 10 === check;
-}
+export { parseBarcode, type ParsedBarcode };
 
 type OpenDatabase = {
   key: "open_beauty_facts" | "open_food_facts" | "open_products_facts";
@@ -75,11 +51,12 @@ type OpenFactsProduct = {
   brands?: string;
   quantity?: string;
   ingredients_text?: string;
+  image_front_url?: string;
   last_modified_t?: number;
 };
 
 async function fetchOpenFacts(source: OpenDatabase, code: string): Promise<OpenFactsProduct | null> {
-  const url = `${source.origin}/api/v2/product/${code}.json?fields=product_name,brands,quantity,ingredients_text,last_modified_t`;
+  const url = `${source.origin}/api/v2/product/${code}.json?fields=product_name,brands,quantity,ingredients_text,image_front_url,last_modified_t`;
   try {
     const response = await fetch(url, {
       headers: { "User-Agent": USER_AGENT, Accept: "application/json" },
@@ -95,7 +72,7 @@ async function fetchOpenFacts(source: OpenDatabase, code: string): Promise<OpenF
   }
 }
 
-export type BarcodeMatch = { product: LivProduct; source: "liv_catalog" | OpenDatabase["key"] };
+export type BarcodeMatch = { product: LivProduct; source: "liv_catalog" | OpenDatabase["key"] | "upcitemdb" };
 
 export async function findProductByBarcode(barcode: ParsedBarcode): Promise<BarcodeMatch | null> {
   // 1. Liv's own database.
@@ -151,6 +128,8 @@ export async function findProductByBarcode(barcode: ParsedBarcode): Promise<Barc
         communityRating: null,
         communityReviewCount: null,
         communityRatingSource: null,
+        imageUrl: found.image_front_url?.startsWith("https://") ? found.image_front_url : null,
+        imageAttribution: found.image_front_url?.startsWith("https://") ? `Image from ${source.label.replace(" product record", "")} contributors, CC BY-SA` : null,
       })
       .onConflictDoNothing()
       .returning();
@@ -163,6 +142,17 @@ export async function findProductByBarcode(barcode: ParsedBarcode): Promise<Barc
       .where(inArray(livProducts.id, barcode.candidates))
       .limit(1);
     if (raced) return { product: raced, source: source.key };
+  }
+
+  // 4. Broad retail database (candles, devices, home goods, and more).
+  for (const code of barcode.candidates) {
+    const retail = await lookupUpcItemdb(code, barcode.canonical);
+    if (!retail) continue;
+    const { updatedAt: _ignored, ...values } = retail;
+    const [saved] = await db.insert(livProducts).values(values).onConflictDoNothing().returning();
+    if (saved) return { product: saved, source: "upcitemdb" };
+    const [raced] = await db.select().from(livProducts).where(inArray(livProducts.id, barcode.candidates)).limit(1);
+    if (raced) return { product: raced, source: "upcitemdb" };
   }
 
   return null;

@@ -29,5 +29,12 @@ export interface LivProduct {
   communityReviewCount?: number | null;
   /** @nullable */
   communityRatingSource?: string | null;
+  /**
+     * Product image URL from a source that permits display; null when none is available
+     * @nullable
+     */
+  imageUrl?: string | null;
+  /** @nullable */
+  imageAttribution?: string | null;
   updatedAt?: Date;
 }

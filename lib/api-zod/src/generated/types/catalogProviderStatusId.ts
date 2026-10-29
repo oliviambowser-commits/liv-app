@@ -12,4 +12,5 @@ export type CatalogProviderStatusId = typeof CatalogProviderStatusId[keyof typeo
 export const CatalogProviderStatusId = {
   open_beauty_facts: 'open_beauty_facts',
   open_products_facts: 'open_products_facts',
+  upcitemdb: 'upcitemdb',
 } as const;

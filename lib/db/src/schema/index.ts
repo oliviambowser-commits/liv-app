@@ -46,6 +46,8 @@ export const livProducts = pgTable("liv_products", {
   communityRating: real("community_rating"),
   communityReviewCount: integer("community_review_count"),
   communityRatingSource: text("community_rating_source"),
+  imageUrl: text("image_url"),
+  imageAttribution: text("image_attribution"),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

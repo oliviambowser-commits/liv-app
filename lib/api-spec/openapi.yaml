@@ -223,6 +223,11 @@ components:
           type: [integer, "null"]
         communityRatingSource:
           type: [string, "null"]
+        imageUrl:
+          type: [string, "null"]
+          description: Product image URL from a source that permits display; null when none is available
+        imageAttribution:
+          type: [string, "null"]
         updatedAt:
           type: string
           format: date-time
@@ -240,7 +245,7 @@ components:
       properties:
         id:
           type: string
-          enum: [open_beauty_facts, open_products_facts]
+          enum: [open_beauty_facts, open_products_facts, upcitemdb]
         label:
           type: string
         status:

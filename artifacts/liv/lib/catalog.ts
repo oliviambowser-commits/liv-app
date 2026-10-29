@@ -46,6 +46,8 @@ export type CatalogProduct = {
   communityRating: number | null;
   communityReviewCount: number | null;
   communityRatingSource: string | null;
+  imageUrl?: string | null;
+  imageAttribution?: string | null;
   updatedAt: string;
 };
 
@@ -104,7 +106,7 @@ export async function askLiv(payload: {
 export type BarcodeLookup = {
   product: CatalogProduct;
   match: "confirmed";
-  source: "liv_catalog" | "open_beauty_facts" | "open_food_facts" | "open_products_facts";
+  source: "liv_catalog" | "open_beauty_facts" | "open_food_facts" | "open_products_facts" | "upcitemdb";
 };
 
 /** Returns null when no product record matches the barcode yet. */
