@@ -3,7 +3,7 @@ import { boolean, integer, jsonb, pgTable, real, serial, text, timestamp } from 
 export type LivSource = {
   label: string;
   url: string;
-  sourceType: "community_database" | "manufacturer" | "scientific_literature";
+  sourceType: "community_database" | "manufacturer" | "scientific_literature" | "web_research";
   license?: string;
   retrievedAt: string;
   sourceUpdatedAt?: string;
@@ -32,6 +32,19 @@ export type LivProductScore = {
   coverage: string;
 };
 
+/** One researched fact shown on a product page, always tied to its source. */
+export type LivDetail = { label: string; value: string; sourceUrl: string };
+
+export type DiscoveryCandidate = {
+  brand: string;
+  name: string;
+  variant: string | null;
+  size: string | null;
+  category: string;
+  productUrl: string;
+  isOfficialSite: boolean;
+};
+
 export const livProducts = pgTable("liv_products", {
   id: text("id").primaryKey(),
   brand: text("brand").notNull(),
@@ -48,6 +61,12 @@ export const livProducts = pgTable("liv_products", {
   communityRatingSource: text("community_rating_source"),
   imageUrl: text("image_url"),
   imageAttribution: text("image_attribution"),
+  // confirmed: exact identity verified (barcode); probable: read from the brand's
+  // own product page; unverified: assembled from other web sources.
+  matchConfidence: text("match_confidence"),
+  productUrl: text("product_url"),
+  summary: text("summary"),
+  details: jsonb("details").$type<LivDetail[]>().notNull().default([]),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -64,6 +83,14 @@ export const aiUsageEvents = pgTable("ai_usage_events", {
   catalogCacheHit: boolean("catalog_cache_hit").notNull().default(false),
   success: boolean("success").notNull(),
   errorCategory: text("error_category"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+// Products found by Liv's web research, held briefly so the user can pick one.
+export const discoveryCandidates = pgTable("discovery_candidates", {
+  id: text("id").primaryKey(),
+  query: text("query").notNull(),
+  candidate: jsonb("candidate").$type<DiscoveryCandidate>().notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

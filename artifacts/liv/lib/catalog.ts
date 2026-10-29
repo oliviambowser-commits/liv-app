@@ -3,7 +3,7 @@ import { searchCatalogProducts, setBaseUrl } from "@workspace/api-client-react";
 export type CatalogSource = {
   label: string;
   url: string;
-  sourceType: "community_database" | "manufacturer" | "scientific_literature";
+  sourceType: "community_database" | "manufacturer" | "scientific_literature" | "web_research";
   license?: string;
   retrievedAt: string;
   sourceUpdatedAt?: string;
@@ -48,6 +48,10 @@ export type CatalogProduct = {
   communityRatingSource: string | null;
   imageUrl?: string | null;
   imageAttribution?: string | null;
+  matchConfidence?: "confirmed" | "probable" | "unverified" | null;
+  productUrl?: string | null;
+  summary?: string | null;
+  details?: { label: string; value: string; sourceUrl: string }[];
   updatedAt: string;
 };
 
@@ -139,4 +143,39 @@ export async function identifyPhoto(imageBase64: string): Promise<PackageIdentif
   const result = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(result.message ?? "Liv couldn't read this photo.");
   return result as PackageIdentification;
+}
+
+export type DiscoveryCandidate = {
+  id: string;
+  brand: string;
+  name: string;
+  variant: string | null;
+  size: string | null;
+  category: string;
+  productUrl: string;
+  isOfficialSite: boolean;
+};
+
+/** Asks Liv to find products for any brand or product name on the web. */
+export async function discoverProducts(query: string): Promise<{ candidates: DiscoveryCandidate[]; note: string }> {
+  const response = await fetch(apiUrl("/liv/discover"), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ query }),
+  });
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(result.message ?? "Liv couldn't search the web right now.");
+  return result as { candidates: DiscoveryCandidate[]; note: string };
+}
+
+/** Researches one found product and returns its new product page record. */
+export async function buildDiscoveredProduct(candidateId: string): Promise<CatalogProduct> {
+  const response = await fetch(apiUrl("/liv/discover/build"), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ candidateId }),
+  });
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(result.message ?? "Liv couldn't research this product.");
+  return result.product as CatalogProduct;
 }

@@ -42,8 +42,28 @@ export type IdentifyResult = {
   outputTokens: number;
 };
 
+/** Web research that must return JSON matching `schema`. */
+export type StructuredResearchRequest = {
+  model: string;
+  instructions: string;
+  input: string;
+  schemaName: string;
+  schema: Record<string, unknown>;
+  maxOutputTokens: number;
+};
+
+export type StructuredResearchResult = {
+  data: unknown;
+  /** Every URL the model actually saw: search results, opened pages, citations. */
+  seenUrls: string[];
+  inputTokens: number;
+  outputTokens: number;
+  webSearchCalls: number;
+};
+
 export interface AIProvider {
   readonly name: string;
   research(request: ResearchRequest): Promise<ResearchResult>;
   identifyFromImage(request: IdentifyRequest): Promise<IdentifyResult>;
+  structuredWebResearch(request: StructuredResearchRequest): Promise<StructuredResearchResult>;
 }

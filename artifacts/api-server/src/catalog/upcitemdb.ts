@@ -80,6 +80,10 @@ function toLivProduct(item: UpcItem, canonicalId: string): LivProduct | null {
     communityRatingSource: null,
     imageUrl: firstImage(item.images),
     imageAttribution: firstImage(item.images) ? "Image via UPCitemdb from a retail listing" : null,
+    matchConfidence: "confirmed",
+    productUrl: null,
+    summary: null,
+    details: [],
     updatedAt: new Date(),
   };
 }

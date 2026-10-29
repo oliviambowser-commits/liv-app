@@ -53,6 +53,10 @@ export const SearchCatalogProductsResponse = zod.object({
   "communityRatingSource": zod.string().nullish(),
   "imageUrl": zod.string().nullish().describe('Product image URL from a source that permits display; null when none is available'),
   "imageAttribution": zod.string().nullish(),
+  "matchConfidence": zod.string().nullish().describe('confirmed (barcode-verified), probable (read from the brand\'s page), or unverified'),
+  "productUrl": zod.string().nullish(),
+  "summary": zod.string().nullish(),
+  "details": zod.array(zod.record(zod.string(), zod.unknown())).optional(),
   "updatedAt": zod.coerce.date().optional()
 })),
   "providers": zod.array(zod.object({
@@ -89,6 +93,10 @@ export const GetCatalogProductResponse = zod.object({
   "communityRatingSource": zod.string().nullish(),
   "imageUrl": zod.string().nullish().describe('Product image URL from a source that permits display; null when none is available'),
   "imageAttribution": zod.string().nullish(),
+  "matchConfidence": zod.string().nullish().describe('confirmed (barcode-verified), probable (read from the brand\'s page), or unverified'),
+  "productUrl": zod.string().nullish(),
+  "summary": zod.string().nullish(),
+  "details": zod.array(zod.record(zod.string(), zod.unknown())).optional(),
   "updatedAt": zod.coerce.date().optional()
 })
 })

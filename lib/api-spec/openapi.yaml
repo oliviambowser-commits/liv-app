@@ -228,6 +228,18 @@ components:
           description: Product image URL from a source that permits display; null when none is available
         imageAttribution:
           type: [string, "null"]
+        matchConfidence:
+          type: [string, "null"]
+          description: confirmed (barcode-verified), probable (read from the brand's page), or unverified
+        productUrl:
+          type: [string, "null"]
+        summary:
+          type: [string, "null"]
+        details:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
         updatedAt:
           type: string
           format: date-time

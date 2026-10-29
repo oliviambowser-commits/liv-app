@@ -7,6 +7,8 @@ import type {
   ResearchRequest,
   ResearchResult,
   SourceCitation,
+  StructuredResearchRequest,
+  StructuredResearchResult,
 } from "./types";
 
 const nullableString = { type: ["string", "null"] };
@@ -148,6 +150,50 @@ export class OpenAIResponsesProvider implements AIProvider {
       identification,
       inputTokens: response.usage?.input_tokens ?? 0,
       outputTokens: response.usage?.output_tokens ?? 0,
+    };
+  }
+
+  async structuredWebResearch(request: StructuredResearchRequest): Promise<StructuredResearchResult> {
+    const response = await openai.responses.create({
+      model: request.model,
+      instructions: request.instructions,
+      input: request.input,
+      tools: [{ type: "web_search", search_context_size: "medium", user_location: { type: "approximate", country: "US" } }],
+      include: ["web_search_call.action.sources"],
+      text: { format: { type: "json_schema", name: request.schemaName, strict: true, schema: request.schema } },
+      max_output_tokens: request.maxOutputTokens,
+    });
+
+    const seen = new Set<string>();
+    let webSearchCalls = 0;
+    for (const item of (response.output ?? []) as unknown as Array<Record<string, unknown>>) {
+      if (item.type === "web_search_call") {
+        webSearchCalls += 1;
+        const action = (item.action ?? {}) as { type?: string; url?: string; sources?: Array<{ url?: string }> };
+        for (const source of action.sources ?? []) if (typeof source?.url === "string") seen.add(source.url);
+        if (typeof action.url === "string") seen.add(action.url);
+      }
+      if (item.type === "message") {
+        for (const content of (item.content ?? []) as Array<{ annotations?: Array<Record<string, unknown>> }>) {
+          for (const annotation of content.annotations ?? []) {
+            if (annotation.type === "url_citation" && typeof annotation.url === "string") seen.add(annotation.url);
+          }
+        }
+      }
+    }
+
+    let data: unknown = null;
+    try {
+      data = JSON.parse(response.output_text || "null");
+    } catch {
+      data = null;
+    }
+    return {
+      data,
+      seenUrls: [...seen],
+      inputTokens: response.usage?.input_tokens ?? 0,
+      outputTokens: response.usage?.output_tokens ?? 0,
+      webSearchCalls,
     };
   }
 }

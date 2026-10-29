@@ -15,6 +15,8 @@ export type LivProductIngredientEvidenceItem = { [key: string]: unknown };
 
 export type LivProductScoresItem = { [key: string]: unknown };
 
+export type LivProductDetailsItem = { [key: string]: unknown };
+
 export interface LivProduct {
   /** Canonical barcode identifier for this exact product record */
   id: string;
@@ -42,6 +44,16 @@ export interface LivProduct {
   imageUrl?: string | null;
   /** @nullable */
   imageAttribution?: string | null;
+  /**
+     * confirmed (barcode-verified), probable (read from the brand's page), or unverified
+     * @nullable
+     */
+  matchConfidence?: string | null;
+  /** @nullable */
+  productUrl?: string | null;
+  /** @nullable */
+  summary?: string | null;
+  details?: LivProductDetailsItem[];
   updatedAt?: string;
 }
 

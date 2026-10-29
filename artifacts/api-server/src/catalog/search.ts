@@ -129,6 +129,10 @@ function toLivProduct(item: ProviderProduct, provider: Provider): LivProduct | n
     communityRatingSource: null,
     imageUrl: item.image_front_url?.startsWith("https://") ? item.image_front_url : null,
     imageAttribution: item.image_front_url?.startsWith("https://") ? `Image from ${provider.label} contributors, CC BY-SA` : null,
+    matchConfidence: "confirmed",
+    productUrl: null,
+    summary: null,
+    details: [],
     updatedAt: new Date(),
   };
 }

@@ -5,6 +5,7 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { LivProductDetailsItem } from './livProductDetailsItem';
 import type { LivProductIngredientEvidenceItem } from './livProductIngredientEvidenceItem';
 import type { LivProductScoresItem } from './livProductScoresItem';
 import type { LivProductSourcesItem } from './livProductSourcesItem';
@@ -36,5 +37,15 @@ export interface LivProduct {
   imageUrl?: string | null;
   /** @nullable */
   imageAttribution?: string | null;
+  /**
+     * confirmed (barcode-verified), probable (read from the brand's page), or unverified
+     * @nullable
+     */
+  matchConfidence?: string | null;
+  /** @nullable */
+  productUrl?: string | null;
+  /** @nullable */
+  summary?: string | null;
+  details?: LivProductDetailsItem[];
   updatedAt?: Date;
 }

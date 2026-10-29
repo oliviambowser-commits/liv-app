@@ -17,6 +17,7 @@ export * from './catalogProviderStatusStatus';
 export * from './getCatalogProduct200';
 export * from './healthStatus';
 export * from './livProduct';
+export * from './livProductDetailsItem';
 export * from './livProductIngredientEvidenceItem';
 export * from './livProductScoresItem';
 export * from './livProductSourcesItem';
