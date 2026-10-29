@@ -93,3 +93,41 @@ export async function askLiv(payload: {
   if (!response.ok) throw new Error(result.message ?? "Liv could not complete this research.");
   return result as AskResult;
 }
+
+export type BarcodeLookup = {
+  product: CatalogProduct;
+  match: "confirmed";
+  source: "liv_catalog" | "open_beauty_facts" | "open_food_facts";
+};
+
+/** Returns null when no product record matches the barcode yet. */
+export async function lookupBarcode(code: string): Promise<BarcodeLookup | null> {
+  const response = await fetch(apiUrl(`/catalog/barcode/${encodeURIComponent(code)}`));
+  if (response.status === 404) return null;
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(result.message ?? "Liv couldn't look up this barcode.");
+  return result as BarcodeLookup;
+}
+
+export type PackageIdentification = {
+  status: "probable" | "unverified" | "unreadable";
+  brand: string | null;
+  productName: string | null;
+  variant: string | null;
+  size: string | null;
+  category: string | null;
+  barcodeDigits: string | null;
+  visibleText: string[];
+  notes: string;
+};
+
+export async function identifyPhoto(imageBase64: string): Promise<PackageIdentification> {
+  const response = await fetch(apiUrl("/liv/identify"), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ imageBase64 }),
+  });
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(result.message ?? "Liv couldn't read this photo.");
+  return result as PackageIdentification;
+}

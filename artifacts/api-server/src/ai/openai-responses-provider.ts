@@ -1,5 +1,67 @@
 import { openai } from "@workspace/integrations-openai-ai-server";
-import type { AIProvider, ResearchRequest, ResearchResult, SourceCitation } from "./types";
+import type {
+  AIProvider,
+  IdentifyRequest,
+  IdentifyResult,
+  PackageIdentification,
+  ResearchRequest,
+  ResearchResult,
+  SourceCitation,
+} from "./types";
+
+const nullableString = { type: ["string", "null"] };
+const identificationSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["status", "brand", "productName", "variant", "size", "category", "barcodeDigits", "visibleText", "notes"],
+  properties: {
+    status: { type: "string", enum: ["probable", "unverified", "unreadable"] },
+    brand: nullableString,
+    productName: nullableString,
+    variant: nullableString,
+    size: nullableString,
+    category: nullableString,
+    barcodeDigits: nullableString,
+    visibleText: { type: "array", items: { type: "string" } },
+    notes: { type: "string" },
+  },
+};
+
+const unreadable: PackageIdentification = {
+  status: "unreadable",
+  brand: null,
+  productName: null,
+  variant: null,
+  size: null,
+  category: null,
+  barcodeDigits: null,
+  visibleText: [],
+  notes: "Liv couldn't read this package. Try a closer, well-lit photo of the front label.",
+};
+
+function cleanText(value: unknown, max = 120): string | null {
+  return typeof value === "string" && value.trim() ? value.trim().slice(0, max) : null;
+}
+
+function sanitizeIdentification(raw: unknown): PackageIdentification {
+  if (!raw || typeof raw !== "object") return unreadable;
+  const value = raw as Record<string, unknown>;
+  const status = value.status === "probable" || value.status === "unverified" ? value.status : "unreadable";
+  const barcode = typeof value.barcodeDigits === "string" ? value.barcodeDigits.replace(/\D/g, "") : "";
+  return {
+    status,
+    brand: cleanText(value.brand),
+    productName: cleanText(value.productName),
+    variant: cleanText(value.variant),
+    size: cleanText(value.size, 40),
+    category: cleanText(value.category, 60),
+    barcodeDigits: [8, 12, 13, 14].includes(barcode.length) ? barcode : null,
+    visibleText: Array.isArray(value.visibleText)
+      ? value.visibleText.filter((item): item is string => typeof item === "string").slice(0, 12).map((item) => item.slice(0, 120))
+      : [],
+    notes: cleanText(value.notes, 400) ?? "",
+  };
+}
 
 type RawOutputItem = {
   type?: string;
@@ -48,6 +110,44 @@ export class OpenAIResponsesProvider implements AIProvider {
       inputTokens: usage?.input_tokens ?? 0,
       outputTokens: usage?.output_tokens ?? 0,
       webSearchCalls,
+    };
+  }
+
+  async identifyFromImage(request: IdentifyRequest): Promise<IdentifyResult> {
+    const response = await openai.responses.create({
+      model: request.model,
+      instructions:
+        "You read consumer product packaging for Liv. Report only what is visible in the photo. Never guess a brand, product name, variant, size, or barcode you cannot read; use null instead. Use status \"probable\" only when the brand and product name are both clearly legible. Use \"unverified\" when you can read part of the package but key details are unclear. Use \"unreadable\" when the image does not show a readable product package. Do not describe ingredients, safety, effectiveness, or claims; Liv looks those up separately from sources. In notes, briefly say what was unclear and what photo would help.",
+      input: [
+        {
+          role: "user",
+          content: [
+            { type: "input_text", text: "Identify the product in this photo from its visible packaging." },
+            { type: "input_image", image_url: `data:${request.mediaType};base64,${request.imageBase64}`, detail: "auto" },
+          ],
+        },
+      ],
+      text: {
+        format: {
+          type: "json_schema",
+          name: "package_identification",
+          strict: true,
+          schema: identificationSchema,
+        },
+      },
+      max_output_tokens: 600,
+    });
+
+    let identification = unreadable;
+    try {
+      identification = sanitizeIdentification(JSON.parse(response.output_text || "null"));
+    } catch {
+      identification = unreadable;
+    }
+    return {
+      identification,
+      inputTokens: response.usage?.input_tokens ?? 0,
+      outputTokens: response.usage?.output_tokens ?? 0,
     };
   }
 }

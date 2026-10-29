@@ -3,7 +3,7 @@ import type { LivEvidence, LivProductScore, LivSource } from "@workspace/db";
 const sourceDate = "2026-10-28";
 const openBeautyFactsLicense = "Open Beauty Facts database: ODbL 1.0; individual record: DbCL";
 
-const noScores: LivProductScore[] = [
+export const noScores: LivProductScore[] = [
   {
     dimension: "Ingredients & Safety",
     value: null,

@@ -28,6 +28,9 @@ app.use(
   }),
 );
 app.use(cors());
+// Package photos are larger than the default 100kb JSON limit. Only the
+// photo route accepts big bodies; every other route keeps the default.
+app.use("/api/liv/identify", express.json({ limit: "8mb" }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 

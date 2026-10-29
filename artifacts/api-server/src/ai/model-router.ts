@@ -1,5 +1,9 @@
 export type AIModel = "gpt-6-luna" | "gpt-6.1-sol";
 
+// Model used to read product packaging from photos. Confirm this model
+// accepts image input in your OpenAI account before shipping.
+export const VISION_MODEL: AIModel = "gpt-6.1-sol";
+
 export function chooseModel(question: string, historyLength: number): AIModel {
   const complex =
     historyLength >= 4 ||

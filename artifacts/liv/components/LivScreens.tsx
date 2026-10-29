@@ -14,12 +14,12 @@ const medium = 'Inter_500Medium';
 const semi = 'Inter_600SemiBold';
 
 function Txt({ children, style, ...props }: any) { return <Text {...props} style={[s.text, style]}>{children}</Text>; }
-function Page({ children, scroll = true }: { children: React.ReactNode; scroll?: boolean }) {
+export function Page({ children, scroll = true }: { children: React.ReactNode; scroll?: boolean }) {
   const insets = useSafeAreaInsets();
   if (!scroll) return <View style={[s.page, { paddingTop: insets.top + 12, paddingBottom: insets.bottom + 14 }]}>{children}</View>;
   return <ScrollView style={s.page} contentContainerStyle={{ paddingTop: insets.top + 12, paddingBottom: Math.max(insets.bottom, 18) + 100, paddingHorizontal: 20 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>{children}</ScrollView>;
 }
-function Header({ title, back = false, action, onAction }: { title: string; back?: boolean; action?: string; onAction?: () => void }) {
+export function Header({ title, back = false, action, onAction }: { title: string; back?: boolean; action?: string; onAction?: () => void }) {
   const router = useRouter();
   return <View style={s.header}>
     {back ? <Pressable onPress={() => router.back()} accessibilityRole="button" accessibilityLabel="Go back" style={s.iconBtn}><Feather name="arrow-left" size={21} color={C.foreground}/></Pressable> : <Txt style={s.wordmark}>liv.</Txt>}
@@ -28,7 +28,7 @@ function Header({ title, back = false, action, onAction }: { title: string; back
   </View>;
 }
 function DemoTag({ label = 'DEMO CONTENT' }: { label?: string }) { return <View style={s.demoTag}><View style={s.demoDot}/><Txt style={s.demoText}>{label}</Txt></View>; }
-function Button({ title, onPress, secondary = false, icon }: { title: string; onPress: () => void; secondary?: boolean; icon?: any }) {
+export function Button({ title, onPress, secondary = false, icon }: { title: string; onPress: () => void; secondary?: boolean; icon?: any }) {
   return <Pressable onPress={onPress} accessibilityRole="button" style={({ pressed }) => [s.button, secondary && s.buttonSecondary, pressed && s.pressed]}>
     {icon && <Feather name={icon} size={17} color={secondary ? C.primary : C.primaryForeground}/>}
     <Txt style={[s.buttonText, secondary && s.buttonSecondaryText]}>{title}</Txt>
@@ -63,7 +63,7 @@ export function HomeScreen() {
   const [draft, setDraft] = useState('');
   const { prefs } = useLiv();
   return <Page><Header title="Thoughtful choices"/><View style={s.hero}>
-    <View style={s.heroTop}><Txt style={s.eyebrow}>A LITTLE MORE CLARITY</Txt><Feather name="feather" size={17} color={C.gold}/></View>
+    <View style={s.heroTop}><Txt style={[s.eyebrow, { color: C.gold }]}>A LITTLE MORE CLARITY</Txt><Feather name="feather" size={17} color={C.gold}/></View>
     <Txt style={s.heroTitle}>Before you buy it, ask Liv.</Txt>
     <Txt style={s.heroCopy}>A calmer way to understand what’s in the things you bring home.</Txt>
     <View style={s.composer}><TextInput value={draft} onChangeText={setDraft} placeholder="Ask about a product or ingredient…" placeholderTextColor={C.mutedForeground} style={s.composerInput} accessibilityLabel="Ask Liv a question" returnKeyType="send" onSubmitEditing={() => {}}/>
@@ -104,7 +104,7 @@ export function SearchScreen() {
     }, 220);
     return () => { active = false; clearTimeout(timer); };
   }, [query]);
-  return <Page><Header title="Search"/><View style={s.pageIntro}><Txt style={s.pageTitle}>Find your next<br/>informed choice.</Txt><Txt style={s.introCopy}>Search a product, brand, category or ingredient.</Txt></View>
+  return <Page><Header title="Search"/><View style={s.pageIntro}><Txt style={s.pageTitle}>Find your next{"\n"}informed choice.</Txt><Txt style={s.introCopy}>Search a product, brand, category or ingredient.</Txt></View>
     <View style={s.searchBox}><Feather name="search" size={18} color={C.mutedForeground}/><TextInput value={query} onChangeText={setQuery} placeholder="Try “ceramides”" placeholderTextColor={C.mutedForeground} style={s.searchInput} autoCorrect={false} accessibilityLabel="Search products and ingredients"/>{query.length > 0 && <Pressable onPress={() => setQuery('')} accessibilityLabel="Clear search"><Feather name="x-circle" size={18} color={C.mutedForeground}/></Pressable>}</View>
     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.chipRow}>{filters.map((x) => <Chip key={x} label={x} active={filter === x} onPress={() => setFilter(x)}/>)}</ScrollView>
     <View style={s.sourceHeading}><SectionTitle>Sourced skincare pilot</SectionTitle><Txt style={s.sourceCaption}>Open Beauty Facts · community-submitted records</Txt></View>
@@ -124,20 +124,6 @@ function CatalogProductCard({ product }: { product: CatalogProduct }) {
     <View style={s.productInfo}><Txt style={s.brand}>{product.brand}</Txt><Txt style={s.productName}>{product.name}</Txt><Txt style={s.productMeta}>{product.quantity || 'Package size not listed'} · barcode {product.id}</Txt><Txt style={s.scoreMeta}>Community-submitted · not independently verified</Txt></View>
     <Feather name="chevron-right" size={18} color={C.mutedForeground}/>
   </Pressable>;
-}
-
-export function ScanScreen() {
-  const [code, setCode] = useState('');
-  const [submitted, setSubmitted] = useState(false);
-  const found = PRODUCTS.find((p) => p.code.toLowerCase() === code.trim().toLowerCase());
-  const router = useRouter();
-  return <Page><Header title="Product code"/><View style={s.scanHero}><View style={s.scanGlyph}><Feather name="maximize" size={33} color={C.primary}/></View><Txt style={s.pageTitle}>A manual lookup,<br/>not a live scan.</Txt><Txt style={s.introCopy}>Liv doesn’t use your camera or connect to a barcode database in this demo. Enter one of the sample codes to explore a product profile.</Txt></View>
-    <View style={s.demoBanner}><Feather name="alert-circle" size={17} color={C.primary}/><Txt style={s.bannerCopy}>Manual-code demo only · no camera, no internet lookup</Txt></View>
-    <Txt style={s.inputLabel}>Barcode or sample code</Txt><View style={s.codeInputWrap}><TextInput value={code} onChangeText={(v) => { setCode(v); setSubmitted(false); }} placeholder="Enter a code" placeholderTextColor={C.mutedForeground} style={s.codeInput} accessibilityLabel="Enter a sample product code" autoCapitalize="characters"/><Pressable onPress={() => { Keyboard.dismiss(); setSubmitted(true); }} accessibilityRole="button" style={s.lookupBtn}><Txt style={s.lookupText}>Look up</Txt></Pressable></View>
-    {submitted && found && <Pressable onPress={() => router.push(`/product/${found.id}`)} style={s.foundCard}><Image source={found.image} style={s.foundImage}/><View style={{ flex: 1 }}><Txt style={s.brand}>{found.brand}</Txt><Txt style={s.productName}>{found.name}</Txt><Txt style={s.smallLink}>Open sample profile  ›</Txt></View></Pressable>}
-    {submitted && !found && <View style={s.emptyCard}><Feather name="help-circle" size={24} color={C.primary}/><Txt style={s.emptyTitle}>No sample match</Txt><Txt style={s.emptyCopy}>No matching product exists in this local demo set. You can search by product or ingredient instead.</Txt><Button title="Search the sample set" secondary onPress={() => router.push('/search')}/></View>}
-    <SectionTitle>Sample codes</SectionTitle>{PRODUCTS.map((p) => <Pressable key={p.id} onPress={() => setCode(p.code)} style={s.codeRow}><Feather name="tag" size={16} color={C.primary}/><Txt style={s.codeProduct}>{p.name}</Txt><Txt style={s.code}>{p.code}</Txt></Pressable>)}
-  </Page>;
 }
 
 export function CommunityScreen() {
@@ -314,7 +300,7 @@ export function CompareScreen() {
   const router = useRouter(); const { compare, addCompare, removeCompare } = useLiv();
   const selected = compare.map((id) => PRODUCTS.find((p) => p.id === id)).filter((p): p is Product => !!p).slice(0, 2);
   const available = PRODUCTS.filter((p) => !compare.includes(p.id));
-  return <Page><Header title="Compare" back action="Clear" onAction={() => compare.forEach(removeCompare)}/><View style={s.pageIntro}><Txt style={s.pageTitle}>Two products.<br/>Your priorities.</Txt><Txt style={s.introCopy}>Compare dimensions side by side. No composite score, no single “winner.”</Txt></View><DemoTag/>
+  return <Page><Header title="Compare" back action="Clear" onAction={() => compare.forEach(removeCompare)}/><View style={s.pageIntro}><Txt style={s.pageTitle}>Two products.{"\n"}Your priorities.</Txt><Txt style={s.introCopy}>Compare dimensions side by side. No composite score, no single “winner.”</Txt></View><DemoTag/>
     <View style={s.compareProducts}>{[0, 1].map((i) => { const p = selected[i]; return p ? <View key={p.id} style={s.compareProduct}><Pressable onPress={() => router.push(`/product/${p.id}`)}><Image source={p.image} style={s.compareImage}/></Pressable><Pressable onPress={() => removeCompare(p.id)} style={s.removeCompare} accessibilityLabel={`Remove ${p.name} from comparison`}><Feather name="x" size={14} color={C.primary}/></Pressable><Txt style={s.brand}>{p.brand}</Txt><Txt style={s.compareName}>{p.name}</Txt></View> : <View key={`empty-${i}`} style={s.addProduct}><Feather name="plus-circle" size={25} color={C.primary}/><Txt style={s.addProductText}>Add a sample product</Txt></View>; })}</View>
     {available.length > 0 && selected.length < 2 && <><Txt style={s.inputLabel}>Add to comparison</Txt>{available.map((p) => <Pressable key={p.id} onPress={() => addCompare(p.id)} style={s.addRow}><Image source={p.image} style={s.addRowImage}/><View style={{ flex: 1 }}><Txt style={s.postProductName}>{p.brand}</Txt><Txt style={s.productMeta}>{p.name}</Txt></View><Feather name="plus" size={18} color={C.primary}/></Pressable>)}</>}
     {selected.length === 2 ? <>{DIMENSIONS.map((dim) => <View key={dim} style={s.compareDimension}><Txt style={s.compareDimensionTitle}>{dim}</Txt>{selected.map((p) => <View key={p.id} style={s.compareScore}><Txt style={s.scoreValue}>{p.scores[dim].value}<Txt style={s.scoreOut}>/100</Txt></Txt><View style={s.scoreTrack}><View style={[s.scoreFill, { width: `${p.scores[dim].value}%` }]}/></View><Txt style={s.scoreMeta}>{p.scores[dim].confidence} confidence</Txt></View>)}</View>)}<View style={s.unknownCard}><Feather name="help-circle" size={18} color={C.primary}/><Txt style={[s.consentCopy, { flex: 1 }]}>Unknowns remain: formulas and review examples are not verified. Differences are illustrative only.</Txt></View><Button title="Ask Liv about these two" icon="message-square" onPress={() => router.push('/ask')}/></> : <View style={s.emptyCard}><Txt style={s.emptyTitle}>Pick two to begin</Txt><Txt style={s.emptyCopy}>The second space stays open until you choose another product. Comparisons always use exactly two.</Txt></View>}
