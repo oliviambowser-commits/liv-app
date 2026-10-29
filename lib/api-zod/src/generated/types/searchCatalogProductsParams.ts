@@ -5,10 +5,13 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { SearchCatalogProductsCategory } from './searchCatalogProductsCategory';
 
 export type SearchCatalogProductsParams = {
 /**
  * @maxLength 80
  */
 q?: string;
+category?: SearchCatalogProductsCategory;
+live?: boolean;
 };

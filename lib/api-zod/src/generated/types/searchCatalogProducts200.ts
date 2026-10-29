@@ -5,8 +5,11 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { CatalogProviderStatus } from './catalogProviderStatus';
 import type { LivProduct } from './livProduct';
 
 export type SearchCatalogProducts200 = {
   products: LivProduct[];
+  providers: CatalogProviderStatus[];
+  coverageNotice: string;
 };

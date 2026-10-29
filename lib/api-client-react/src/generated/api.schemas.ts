@@ -38,15 +38,55 @@ export interface LivProduct {
   updatedAt?: string;
 }
 
+export type CatalogProviderStatusId = typeof CatalogProviderStatusId[keyof typeof CatalogProviderStatusId];
+
+
+export const CatalogProviderStatusId = {
+  open_beauty_facts: 'open_beauty_facts',
+  open_products_facts: 'open_products_facts',
+} as const;
+
+export type CatalogProviderStatusStatus = typeof CatalogProviderStatusStatus[keyof typeof CatalogProviderStatusStatus];
+
+
+export const CatalogProviderStatusStatus = {
+  searched: 'searched',
+  rate_limited: 'rate_limited',
+  unavailable: 'unavailable',
+  not_applicable: 'not_applicable',
+} as const;
+
+export interface CatalogProviderStatus {
+  id: CatalogProviderStatusId;
+  label: string;
+  status: CatalogProviderStatusStatus;
+  returned: number;
+}
+
 export type SearchCatalogProductsParams = {
 /**
  * @maxLength 80
  */
 q?: string;
+category?: SearchCatalogProductsCategory;
+live?: boolean;
 };
+
+export type SearchCatalogProductsCategory = typeof SearchCatalogProductsCategory[keyof typeof SearchCatalogProductsCategory];
+
+
+export const SearchCatalogProductsCategory = {
+  All: 'All',
+  Skincare: 'Skincare',
+  Beauty: 'Beauty',
+  Wellness: 'Wellness',
+  Household: 'Household',
+} as const;
 
 export type SearchCatalogProducts200 = {
   products: LivProduct[];
+  providers: CatalogProviderStatus[];
+  coverageNotice: string;
 };
 
 export type GetCatalogProduct200 = {

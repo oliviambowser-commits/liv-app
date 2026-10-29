@@ -1,12 +1,20 @@
 import { Router, type IRouter } from "express";
-import { asc, eq, ilike, or, sql } from "drizzle-orm";
+import { and, asc, eq, ilike, or, sql } from "drizzle-orm";
 import { db, livProducts } from "@workspace/db";
 import rateLimit from "express-rate-limit";
 import { seedProducts } from "../catalog/seed";
 import { findProductByBarcode, parseBarcode } from "../catalog/barcode";
+import { CATALOG_CATEGORIES, searchLiveCatalog, type CatalogCategory } from "../catalog/search";
 
 const router: IRouter = Router();
 let seedPromise: Promise<void> | null = null;
+const liveSearchLimiter = rateLimit({
+  windowMs: 60_000,
+  limit: 6,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: "Live catalog search is temporarily limited. Please try again in a minute." },
+});
 
 async function ensurePilotSeeded() {
   if (!seedPromise) {
@@ -31,20 +39,64 @@ router.get("/catalog/products", async (req, res, next) => {
   try {
     await ensurePilotSeeded();
     const query = typeof req.query.q === "string" ? req.query.q.trim().slice(0, 80) : "";
-    const where = query
+    const requestedCategory = typeof req.query.category === "string" ? req.query.category : "All";
+    const category: CatalogCategory = CATALOG_CATEGORIES.includes(requestedCategory as CatalogCategory)
+      ? requestedCategory as CatalogCategory
+      : "All";
+    const textFilter = query
       ? or(
           ilike(livProducts.name, `%${query}%`),
           ilike(livProducts.brand, `%${query}%`),
           ilike(livProducts.ingredientsText, `%${query}%`),
         )
       : undefined;
+    const where = category === "All"
+      ? textFilter
+      : textFilter
+        ? and(eq(livProducts.category, category), textFilter)
+        : eq(livProducts.category, category);
     const products = await db
       .select()
       .from(livProducts)
       .where(where)
       .orderBy(asc(livProducts.brand), asc(livProducts.name))
       .limit(25);
-    res.json({ products });
+
+    if (req.query.live !== "true") {
+      res.json({
+        products,
+        providers: [],
+        coverageNotice: "Showing Liv's saved records. Submit a search to check approved live catalogs.",
+      });
+      return;
+    }
+    if (query.length < 2) {
+      res.status(400).json({ message: "Enter at least two characters for a live catalog search." });
+      return;
+    }
+    await new Promise<void>((resolve, reject) => {
+      liveSearchLimiter(req, res, (error?: unknown) => error ? reject(error) : resolve());
+    });
+    if (res.headersSent) return;
+
+    const live = await searchLiveCatalog(query, category);
+    const merged = new Map(products.map((product) => [product.id, product]));
+    for (const candidate of live.products) {
+      const existing = merged.get(candidate.id);
+      if (existing) {
+        merged.set(candidate.id, {
+          ...existing,
+          sources: [...existing.sources, ...candidate.sources.filter((source) => !existing.sources.some((item) => item.url === source.url))],
+        });
+      } else {
+        merged.set(candidate.id, candidate);
+      }
+    }
+    res.json({
+      products: [...merged.values()].slice(0, 35),
+      providers: live.providers,
+      coverageNotice: "Live community-database results are incomplete and not independently verified. Open the source record before relying on product details.",
+    });
   } catch (error) {
     next(error);
   }
@@ -55,11 +107,19 @@ router.get("/catalog/products/:id", async (req, res, next) => {
     await ensurePilotSeeded();
     const id = String(req.params.id).trim();
     const [product] = await db.select().from(livProducts).where(eq(livProducts.id, id)).limit(1);
-    if (!product) {
-      res.status(404).json({ message: "No sourced product matches that identifier." });
+    if (product) {
+      res.json({ product });
       return;
     }
-    res.json({ product });
+    const parsed = parseBarcode(id);
+    if (typeof parsed !== "string") {
+      const match = await findProductByBarcode(parsed);
+      if (match) {
+        res.json({ product: match.product });
+        return;
+      }
+    }
+    res.status(404).json({ message: "No sourced product matches that identifier." });
   } catch (error) {
     next(error);
   }

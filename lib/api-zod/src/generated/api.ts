@@ -18,14 +18,17 @@ export const HealthCheckResponse = zod.object({
 
 
 /**
- * @summary Search the curated sourced product pilot
+ * @summary Search saved and approved live product catalogs
  */
 export const searchCatalogProductsQueryQMax = 80;
 
-
+export const searchCatalogProductsQueryCategoryDefault = `All`;
+export const searchCatalogProductsQueryLiveDefault = false;
 
 export const SearchCatalogProductsQueryParams = zod.object({
-  "q": zod.coerce.string().max(searchCatalogProductsQueryQMax).optional()
+  "q": zod.coerce.string().max(searchCatalogProductsQueryQMax).optional(),
+  "category": zod.enum(['All', 'Skincare', 'Beauty', 'Wellness', 'Household']).default(searchCatalogProductsQueryCategoryDefault),
+  "live": zod.coerce.boolean().default(searchCatalogProductsQueryLiveDefault)
 })
 
 export const SearchCatalogProductsResponse = zod.object({
@@ -44,7 +47,14 @@ export const SearchCatalogProductsResponse = zod.object({
   "communityReviewCount": zod.number().int().nullish(),
   "communityRatingSource": zod.string().nullish(),
   "updatedAt": zod.coerce.date().optional()
-}))
+})),
+  "providers": zod.array(zod.object({
+  "id": zod.enum(['open_beauty_facts', 'open_products_facts']),
+  "label": zod.string(),
+  "status": zod.enum(['searched', 'rate_limited', 'unavailable', 'not_applicable']),
+  "returned": zod.number().int()
+})),
+  "coverageNotice": zod.string()
 })
 
 

@@ -11,7 +11,7 @@ tags:
   - name: health
     description: Health operations
   - name: catalog
-    description: Curated source-attributed skincare catalog
+    description: Source-attributed consumer product catalog
   - name: liv-ai
     description: Source-grounded Liv assistant
 paths:
@@ -32,7 +32,7 @@ paths:
     get:
       operationId: searchCatalogProducts
       tags: [catalog]
-      summary: Search the curated sourced product pilot
+      summary: Search saved and approved live product catalogs
       parameters:
         - name: q
           in: query
@@ -40,19 +40,42 @@ paths:
           schema:
             type: string
             maxLength: 80
+        - name: category
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [All, Skincare, Beauty, Wellness, Household]
+            default: All
+        - name: live
+          in: query
+          required: false
+          schema:
+            type: boolean
+            default: false
       responses:
         "200":
-          description: Matching products and source metadata
+          description: Matching products, provider states, and coverage information
           content:
             application/json:
               schema:
                 type: object
-                required: [products]
+                required: [products, providers, coverageNotice]
                 properties:
                   products:
                     type: array
                     items:
                       $ref: "#/components/schemas/LivProduct"
+                  providers:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/CatalogProviderStatus"
+                  coverageNotice:
+                    type: string
+        "400":
+          description: Search query is too short for a live provider search
+        "429":
+          description: Live catalog provider rate limit reached
   /catalog/products/{id}:
     get:
       operationId: getCatalogProduct
@@ -204,4 +227,18 @@ components:
         - sources
         - ingredientEvidence
         - scores
+    CatalogProviderStatus:
+      type: object
+      properties:
+        id:
+          type: string
+          enum: [open_beauty_facts, open_products_facts]
+        label:
+          type: string
+        status:
+          type: string
+          enum: [searched, rate_limited, unavailable, not_applicable]
+        returned:
+          type: integer
+      required: [id, label, status, returned]
 

@@ -149,7 +149,7 @@ export const getSearchCatalogProductsUrl = (params?: SearchCatalogProductsParams
 }
 
 /**
- * @summary Search the curated sourced product pilot
+ * @summary Search saved and approved live product catalogs
  */
 export const searchCatalogProducts = async (params?: SearchCatalogProductsParams, options?: Parameters<typeof customFetch>[1]): Promise<SearchCatalogProducts200> => {
 
@@ -173,7 +173,7 @@ export const getSearchCatalogProductsQueryKey = (params?: SearchCatalogProductsP
     }
 
 
-export const getSearchCatalogProductsQueryOptions = <TData = Awaited<ReturnType<typeof searchCatalogProducts>>, TError = ErrorType<unknown>>(params?: SearchCatalogProductsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof searchCatalogProducts>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getSearchCatalogProductsQueryOptions = <TData = Awaited<ReturnType<typeof searchCatalogProducts>>, TError = ErrorType<void>>(params?: SearchCatalogProductsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof searchCatalogProducts>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
@@ -192,14 +192,14 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 }
 
 export type SearchCatalogProductsQueryResult = NonNullable<Awaited<ReturnType<typeof searchCatalogProducts>>>
-export type SearchCatalogProductsQueryError = ErrorType<unknown>
+export type SearchCatalogProductsQueryError = ErrorType<void>
 
 
 /**
- * @summary Search the curated sourced product pilot
+ * @summary Search saved and approved live product catalogs
  */
 
-export function useSearchCatalogProducts<TData = Awaited<ReturnType<typeof searchCatalogProducts>>, TError = ErrorType<unknown>>(
+export function useSearchCatalogProducts<TData = Awaited<ReturnType<typeof searchCatalogProducts>>, TError = ErrorType<void>>(
  params?: SearchCatalogProductsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof searchCatalogProducts>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
