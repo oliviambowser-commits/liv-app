@@ -4,7 +4,7 @@ import { db, livProducts } from "@workspace/db";
 import rateLimit from "express-rate-limit";
 import { seedProducts } from "../catalog/seed";
 import { findProductByBarcode, parseBarcode } from "../catalog/barcode";
-import { CATALOG_CATEGORIES, searchLiveCatalog, type CatalogCategory } from "../catalog/search";
+import { CATALOG_CATEGORIES, mergeCatalogProducts, searchLiveCatalog, type CatalogCategory } from "../catalog/search";
 
 const router: IRouter = Router();
 let seedPromise: Promise<void> | null = null;
@@ -35,10 +35,15 @@ async function ensurePilotSeeded() {
   await seedPromise;
 }
 
-router.get("/catalog/products", async (req, res, next) => {
+router.get("/catalog/products", (req, res, next) => {
+  if (req.query.live === "true") return liveSearchLimiter(req, res, next);
+  return next();
+}, async (req, res, next) => {
   try {
     await ensurePilotSeeded();
     const query = typeof req.query.q === "string" ? req.query.q.trim().slice(0, 80) : "";
+    const requestedPage = Number(req.query.page ?? 1);
+    const page = Number.isInteger(requestedPage) && requestedPage >= 1 && requestedPage <= 100 ? requestedPage : 1;
     const requestedCategory = typeof req.query.category === "string" ? req.query.category : "All";
     const category: CatalogCategory = CATALOG_CATEGORIES.includes(requestedCategory as CatalogCategory)
       ? requestedCategory as CatalogCategory
@@ -60,6 +65,7 @@ router.get("/catalog/products", async (req, res, next) => {
       .from(livProducts)
       .where(where)
       .orderBy(asc(livProducts.brand), asc(livProducts.name))
+      .offset((page - 1) * 25)
       .limit(25);
 
     if (req.query.live !== "true") {
@@ -74,26 +80,9 @@ router.get("/catalog/products", async (req, res, next) => {
       res.status(400).json({ message: "Enter at least two characters for a live catalog search." });
       return;
     }
-    await new Promise<void>((resolve, reject) => {
-      liveSearchLimiter(req, res, (error?: unknown) => error ? reject(error) : resolve());
-    });
-    if (res.headersSent) return;
-
-    const live = await searchLiveCatalog(query, category);
-    const merged = new Map(products.map((product) => [product.id, product]));
-    for (const candidate of live.products) {
-      const existing = merged.get(candidate.id);
-      if (existing) {
-        merged.set(candidate.id, {
-          ...existing,
-          sources: [...existing.sources, ...candidate.sources.filter((source) => !existing.sources.some((item) => item.url === source.url))],
-        });
-      } else {
-        merged.set(candidate.id, candidate);
-      }
-    }
+    const live = await searchLiveCatalog(query, category, page);
     res.json({
-      products: [...merged.values()].slice(0, 35),
+      products: mergeCatalogProducts(products, live.products).slice(0, 35),
       providers: live.providers,
       coverageNotice: "Live community-database results are incomplete and not independently verified. Open the source record before relying on product details.",
     });

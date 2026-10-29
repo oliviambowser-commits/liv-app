@@ -1,3 +1,5 @@
+import { searchCatalogProducts, setBaseUrl } from "@workspace/api-client-react";
+
 export type CatalogSource = {
   label: string;
   url: string;
@@ -54,12 +56,17 @@ function apiUrl(path: string) {
   return `${origin.replace(/\/+$/, "")}/api${path}`;
 }
 
-export async function searchCatalog(query: string): Promise<CatalogProduct[]> {
-  const params = query.trim() ? `?q=${encodeURIComponent(query.trim())}` : "";
-  const response = await fetch(apiUrl(`/catalog/products${params}`));
-  if (!response.ok) throw new Error("Could not load sourced products.");
-  const result = (await response.json()) as { products: CatalogProduct[] };
-  return result.products;
+export type CatalogCategory = "All" | "Skincare" | "Beauty" | "Wellness" | "Household";
+export type CatalogSearchResult = {
+  products: CatalogProduct[];
+  providers: { id: string; label: string; status: "searched" | "rate_limited" | "unavailable" | "not_applicable"; returned: number }[];
+  coverageNotice: string;
+};
+
+export async function searchCatalog(query: string, category: CatalogCategory = "All", live = false, page = 1): Promise<CatalogSearchResult> {
+  setBaseUrl(apiUrl("").replace(/\/api$/, ""));
+  const result = await searchCatalogProducts({ q: query.trim(), category, live, page });
+  return result as unknown as CatalogSearchResult;
 }
 
 export async function getCatalogProduct(id: string): Promise<CatalogProduct> {
@@ -97,7 +104,7 @@ export async function askLiv(payload: {
 export type BarcodeLookup = {
   product: CatalogProduct;
   match: "confirmed";
-  source: "liv_catalog" | "open_beauty_facts" | "open_food_facts";
+  source: "liv_catalog" | "open_beauty_facts" | "open_food_facts" | "open_products_facts";
 };
 
 /** Returns null when no product record matches the barcode yet. */

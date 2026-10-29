@@ -24,11 +24,16 @@ export const searchCatalogProductsQueryQMax = 80;
 
 export const searchCatalogProductsQueryCategoryDefault = `All`;
 export const searchCatalogProductsQueryLiveDefault = false;
+export const searchCatalogProductsQueryPageDefault = 1;
+export const searchCatalogProductsQueryPageMax = 100;
+
+
 
 export const SearchCatalogProductsQueryParams = zod.object({
   "q": zod.coerce.string().max(searchCatalogProductsQueryQMax).optional(),
   "category": zod.enum(['All', 'Skincare', 'Beauty', 'Wellness', 'Household']).default(searchCatalogProductsQueryCategoryDefault),
-  "live": zod.coerce.boolean().default(searchCatalogProductsQueryLiveDefault)
+  "live": zod.coerce.boolean().default(searchCatalogProductsQueryLiveDefault),
+  "page": zod.coerce.number().int().min(1).max(searchCatalogProductsQueryPageMax).default(searchCatalogProductsQueryPageDefault)
 })
 
 export const SearchCatalogProductsResponse = zod.object({

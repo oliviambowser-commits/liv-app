@@ -14,4 +14,9 @@ export type SearchCatalogProductsParams = {
 q?: string;
 category?: SearchCatalogProductsCategory;
 live?: boolean;
+/**
+ * @minimum 1
+ * @maximum 100
+ */
+page?: number;
 };

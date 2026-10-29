@@ -33,7 +33,7 @@ function hasValidCheckDigit(code: string) {
 }
 
 type OpenDatabase = {
-  key: "open_beauty_facts" | "open_food_facts";
+  key: "open_beauty_facts" | "open_food_facts" | "open_products_facts";
   label: string;
   origin: string;
   category: string;
@@ -43,6 +43,13 @@ type OpenDatabase = {
 // Free, credential-free community databases. Records are collaborative and
 // not guaranteed accurate, so everything from here stays "unverified".
 const OPEN_DATABASES: OpenDatabase[] = [
+  {
+    key: "open_products_facts",
+    label: "Open Products Facts product record",
+    origin: "https://world.openproductsfacts.org",
+    category: "Other consumer product",
+    license: "Open Products Facts database: ODbL 1.0; individual record: DbCL",
+  },
   {
     key: "open_beauty_facts",
     label: "Open Beauty Facts product record",

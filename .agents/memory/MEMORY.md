@@ -1,1 +1,3 @@
 - [Liv research source policy](liv-research-source-policy.md) — Keep web results ephemeral and restrict product claims to approved sources; cache only facts with recorded reuse rights.
+- [Liv catalog scope](liv-catalog-scope.md) — US skincare, beauty, wellness devices/products, and household; source coverage must be disclosed rather than claimed exhaustive.
+- [Orval workspace barrels](orval-workspace-barrels.md) — Filter conflicting workspace re-exports instead of disabling generated type indexes.

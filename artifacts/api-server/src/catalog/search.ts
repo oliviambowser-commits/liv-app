@@ -78,7 +78,7 @@ function providersFor(category: CatalogCategory): Provider[] {
 function categorize(item: ProviderProduct, provider: Provider["id"]): string {
   const text = `${item.categories ?? ""} ${item.product_name ?? ""}`.toLowerCase();
   if (provider === "open_beauty_facts") {
-    return /skin|face|moisturi[sz]|serum|cleanser|sunscreen|spf|body care/.test(text) ? "Skincare" : "Beauty";
+    return /skin|face|moisturi[sz]|serum|cleanser|sunscreen|spf|body care|cream|lotion|balm|toner/.test(text) ? "Skincare" : "Beauty";
   }
   if (/theragun|massage|percussion|recovery|foam roller|wellness|fitness|mobility/.test(text)) return "Wellness";
   if (/household|cleaning|cleaner|laundry|detergent|dish soap|dishwashing|paper towel|trash bag|air freshener|home care/.test(text)) return "Household";
@@ -116,13 +116,14 @@ function toLivProduct(item: ProviderProduct, provider: Provider): LivProduct | n
     communityRating: null,
     communityReviewCount: null,
     communityRatingSource: null,
-    updatedAt: new Date().toISOString(),
+    updatedAt: new Date(),
   };
 }
 
 async function searchProvider(
   provider: Provider,
   query: string,
+  page: number,
 ): Promise<{ products: LivProduct[]; status: CatalogProviderStatus }> {
   if (!takeProviderSlot(provider.id)) {
     return {
@@ -137,6 +138,10 @@ async function searchProvider(
     json: "1",
     page_size: "10",
     fields: FIELDS,
+    page: String(page),
+    tagtype_0: "countries",
+    tag_contains_0: "contains",
+    tag_0: "united-states",
   });
 
   try {
@@ -156,7 +161,8 @@ async function searchProvider(
       };
     }
     const body = (await response.json()) as { products?: ProviderProduct[] };
-    const products = (body.products ?? [])
+    if (!Array.isArray(body.products)) throw new Error("Invalid provider response");
+    const products = body.products
       .map((item) => toLivProduct(item, provider))
       .filter((item): item is LivProduct => item !== null);
     return {
@@ -171,9 +177,9 @@ async function searchProvider(
   }
 }
 
-export async function searchLiveCatalog(query: string, category: CatalogCategory): Promise<LiveCatalogSearch> {
+export async function searchLiveCatalog(query: string, category: CatalogCategory, page = 1): Promise<LiveCatalogSearch> {
   const relevantProviders = providersFor(category);
-  const results = await Promise.all(relevantProviders.map((provider) => searchProvider(provider, query)));
+  const results = await Promise.all(relevantProviders.map((provider) => searchProvider(provider, query, page)));
   const products = results.flatMap((result) => result.products)
     .filter((product) => category === "All" || product.category === category);
   return {
@@ -190,4 +196,16 @@ export async function searchLiveCatalog(query: string, category: CatalogCategory
         })),
     ],
   };
+}
+
+export function mergeCatalogProducts(saved: LivProduct[], live: LivProduct[]): LivProduct[] {
+  const merged = new Map(saved.map((product) => [product.id, product]));
+  for (const candidate of live) {
+    const existing = merged.get(candidate.id);
+    merged.set(candidate.id, existing ? {
+      ...existing,
+      sources: [...existing.sources, ...candidate.sources.filter((source) => !existing.sources.some((item) => item.url === source.url))],
+    } : candidate);
+  }
+  return [...merged.values()];
 }

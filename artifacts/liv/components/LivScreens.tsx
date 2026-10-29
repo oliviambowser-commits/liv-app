@@ -5,7 +5,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { DIMENSIONS, Product, PRODUCTS, useLiv } from '../state/LivContext';
 import colors from '../constants/colors';
-import { AskCitation, CatalogProduct, askLiv, getCatalogProduct, searchCatalog } from '../lib/catalog';
+import { AskCitation, CatalogCategory, CatalogProduct, CatalogSearchResult, askLiv, getCatalogProduct, searchCatalog } from '../lib/catalog';
 
 const C = colors.light;
 const display = 'Manrope_700Bold';
@@ -86,32 +86,65 @@ function QuickAction({ icon, label, onPress }: { icon: any; label: string; onPre
 
 export function SearchScreen() {
   const [query, setQuery] = useState('');
-  const [filter, setFilter] = useState('All');
+  const [filter, setFilter] = useState<CatalogCategory>('All');
   const [catalog, setCatalog] = useState<CatalogProduct[]>([]);
   const [catalogLoading, setCatalogLoading] = useState(true);
   const [catalogError, setCatalogError] = useState('');
-  const filters = ['All', 'Skincare', 'Hair', 'Body', 'Home'];
+  const [providerStates, setProviderStates] = useState<CatalogSearchResult['providers']>([]);
+  const [coverageNotice, setCoverageNotice] = useState('');
+  const [livePage, setLivePage] = useState(0);
+  const searchVersion = useRef(0);
+  const filters: CatalogCategory[] = ['All', 'Skincare', 'Beauty', 'Wellness', 'Household'];
+  const loadLive = async (page = 1) => {
+    if (query.trim().length < 2 || catalogLoading) return;
+    const version = ++searchVersion.current;
+    setCatalogLoading(true);
+    setCatalogError('');
+    try {
+      const result = await searchCatalog(query, filter, true, page);
+      if (version === searchVersion.current) {
+        setCatalog((previous) => page === 1 ? result.products : [...previous, ...result.products.filter((item) => !previous.some((existing) => existing.id === item.id))]);
+        setLivePage(page);
+        setProviderStates(result.providers);
+        setCoverageNotice(result.coverageNotice);
+      }
+    } catch (error: unknown) {
+      if (version === searchVersion.current) setCatalogError(error instanceof Error ? error.message : 'Live catalogs are unavailable.');
+    } finally {
+      if (version === searchVersion.current) setCatalogLoading(false);
+    }
+  };
   const matches = useMemo(() => PRODUCTS.filter((p) => (filter === 'All' || p.category === filter) && `${p.name} ${p.brand} ${p.category} ${p.ingredients.map((i) => i.name).join(' ')}`.toLowerCase().includes(query.toLowerCase().trim())), [query, filter]);
   React.useEffect(() => {
     let active = true;
+    const version = ++searchVersion.current;
+    setProviderStates([]);
+    setLivePage(0);
     const timer = setTimeout(() => {
       setCatalogLoading(true);
-      searchCatalog(query).then((items) => {
-        if (active) { setCatalog(items); setCatalogError(''); }
+      searchCatalog(query, filter).then((result) => {
+        if (active && version === searchVersion.current) { setCatalog(result.products); setCoverageNotice(result.coverageNotice); setCatalogError(''); }
       }).catch((error: unknown) => {
-        if (active) setCatalogError(error instanceof Error ? error.message : 'Sourced products are unavailable.');
-      }).finally(() => { if (active) setCatalogLoading(false); });
+        if (active && version === searchVersion.current) setCatalogError(error instanceof Error ? error.message : 'Sourced products are unavailable.');
+      }).finally(() => { if (active && version === searchVersion.current) setCatalogLoading(false); });
     }, 220);
     return () => { active = false; clearTimeout(timer); };
-  }, [query]);
+  }, [query, filter]);
   return <Page><Header title="Search"/><View style={s.pageIntro}><Txt style={s.pageTitle}>Find your next{"\n"}informed choice.</Txt><Txt style={s.introCopy}>Search a product, brand, category or ingredient.</Txt></View>
     <View style={s.searchBox}><Feather name="search" size={18} color={C.mutedForeground}/><TextInput value={query} onChangeText={setQuery} placeholder="Try “ceramides”" placeholderTextColor={C.mutedForeground} style={s.searchInput} autoCorrect={false} accessibilityLabel="Search products and ingredients"/>{query.length > 0 && <Pressable onPress={() => setQuery('')} accessibilityLabel="Clear search"><Feather name="x-circle" size={18} color={C.mutedForeground}/></Pressable>}</View>
     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.chipRow}>{filters.map((x) => <Chip key={x} label={x} active={filter === x} onPress={() => setFilter(x)}/>)}</ScrollView>
-    <View style={s.sourceHeading}><SectionTitle>Sourced skincare pilot</SectionTitle><Txt style={s.sourceCaption}>Open Beauty Facts · community-submitted records</Txt></View>
+    <Button title="Search live catalogs" icon="search" onPress={() => void loadLive()}/>
+    <View style={s.sourceHeading}><SectionTitle>Sourced products</SectionTitle><Txt style={s.sourceCaption}>US-tagged live results · coverage varies by category and brand</Txt></View>
+    <Txt style={s.scoreMeta}>{query.trim().length < 2 ? 'Enter a product or brand, then choose Search live catalogs. Typing searches saved records only.' : coverageNotice}</Txt>
+    {providerStates.filter((provider) => provider.status !== 'not_applicable').map((provider) => <Txt key={provider.id} style={s.scoreMeta}>{provider.label}: {provider.status === 'searched' ? `${provider.returned} records returned` : provider.status === 'rate_limited' ? 'Search limit reached; try again in a minute.' : 'Temporarily unavailable. Saved records are still shown.'}</Txt>)}
+    <Pressable onPress={() => Linking.openURL('https://world.openbeautyfacts.org/data')}><Txt style={s.smallLink}>Contains data from Open Beauty Facts ↗</Txt></Pressable>
+    <Pressable onPress={() => Linking.openURL('https://world.openproductsfacts.org/data')}><Txt style={s.smallLink}>Contains data from Open Products Facts ↗</Txt></Pressable>
+    <Pressable onPress={() => Linking.openURL('https://opendatacommons.org/licenses/odbl/1.0/')}><Txt style={s.scoreMeta}>Available under the Open Database License (ODbL) ↗</Txt></Pressable>
     {catalogLoading && <Txt style={s.scoreMeta}>Loading sourced records…</Txt>}
     {!!catalogError && <View style={s.unknownCard}><Feather name="wifi-off" size={17} color={C.primary}/><Txt style={[s.consentCopy,{flex:1}]}>{catalogError} Try again when the catalog is available.</Txt></View>}
-    {!catalogLoading && !catalogError && catalog.filter((p) => filter === 'All' || filter === 'Skincare').length === 0 && <Txt style={s.scoreMeta}>No sourced match in this small pilot.</Txt>}
-    {catalog.filter((p) => filter === 'All' || filter === 'Skincare').map((p) => <CatalogProductCard key={p.id} product={p}/>)}
+    {!catalogLoading && !catalogError && catalog.length === 0 && <Txt style={s.scoreMeta}>No sourced match. Connected catalogs do not cover every product or brand; a missing record does not mean the product does not exist.</Txt>}
+    {catalog.map((p) => <CatalogProductCard key={p.id} product={p}/>)}
+    {!catalogLoading && livePage > 0 && providerStates.some((provider) => provider.status === 'searched' && provider.returned >= 10) && <Button title="More catalog matches" secondary onPress={() => void loadLive(livePage + 1)}/>}
     <SectionTitle>Illustrative demo products</SectionTitle>
     <DemoTag/><SectionTitle>{query ? `${matches.length} sample result${matches.length === 1 ? '' : 's'}` : 'A few places to begin'}</SectionTitle>
     {matches.length ? matches.map((p) => <ProductCard key={p.id} product={p}/>) : <View style={s.emptyCard}><View style={s.emptyIcon}><Feather name="search" size={21} color={C.primary}/></View><Txt style={s.emptyTitle}>Nothing in this small sample set</Txt><Txt style={s.emptyCopy}>Try another name or ingredient, or reset your filters.</Txt><Button title="Reset search" secondary onPress={() => { setQuery(''); setFilter('All'); }}/></View>}
@@ -121,7 +154,7 @@ export function SearchScreen() {
 function CatalogProductCard({ product }: { product: CatalogProduct }) {
   const router = useRouter();
   return <Pressable onPress={() => router.push(`/product/${product.id}`)} style={[s.productCard,s.catalogCard]} accessibilityRole="button" accessibilityLabel={`View sourced record: ${product.brand} ${product.name}`}>
-    <View style={s.productInfo}><Txt style={s.brand}>{product.brand}</Txt><Txt style={s.productName}>{product.name}</Txt><Txt style={s.productMeta}>{product.quantity || 'Package size not listed'} · barcode {product.id}</Txt><Txt style={s.scoreMeta}>Community-submitted · not independently verified</Txt></View>
+    <View style={s.productInfo}><Txt style={s.brand}>{product.brand}</Txt><Txt style={s.productName}>{product.name}</Txt><Txt style={s.productMeta}>{product.category} · {product.quantity || 'Package size not listed'} · barcode {product.id}</Txt><Txt style={s.scoreMeta}>Community-submitted · not independently verified</Txt><Txt style={s.scoreMeta}>{product.sources[0]?.label} · retrieved {product.sources[0]?.retrievedAt ?? 'date unknown'}</Txt></View>
     <Feather name="chevron-right" size={18} color={C.mutedForeground}/>
   </Pressable>;
 }
