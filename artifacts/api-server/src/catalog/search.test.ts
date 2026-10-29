@@ -16,7 +16,7 @@ test("normalizes sourced records across four categories without inventing scores
         const url = new URL(String(input));
         assert.equal(url.searchParams.get("tag_0"), "united-states");
         assert.equal(url.searchParams.get("search_terms"), "test brand");
-        return new Response(JSON.stringify({ products: [{ code: "1234567890123", product_name: name, brands: "Test Brand", last_modified_t: 1700000000 }] }));
+        return new Response(JSON.stringify({ products: [{ code: "1234567890128", product_name: name, brands: "Test Brand", last_modified_t: 1700000000 }] }));
       };
       const result = await searchLiveCatalog("test brand", category);
       assert.equal(result.products[0]?.category, category);
@@ -46,6 +46,39 @@ test("distinguishes empty results, provider failure, malformed data, and rate li
     assert.equal((await searchLiveCatalog("malformed", "Beauty")).providers[0]?.status, "unavailable");
     globalThis.fetch = async () => new Response("", { status: 429 });
     assert.equal((await searchLiveCatalog("limited", "Beauty")).providers[0]?.status, "rate_limited");
+  } finally {
+    globalThis.fetch = original;
+  }
+});
+
+test("canonicalizes live barcode IDs and skips invalid codes", async () => {
+  const original = globalThis.fetch;
+  try {
+    const codes = [
+      "851939002067", // UPC-A
+      "0851939002067", // Equivalent EAN-13
+      "00851939002067", // Equivalent zero-prefixed GTIN-14
+      "96385074", // EAN-8
+      "851939002068", // Invalid check digit
+      "not-a-barcode",
+      "",
+      undefined,
+      851939002067,
+    ];
+    globalThis.fetch = async () => new Response(JSON.stringify({
+      products: codes.map((code) => ({ code, product_name: "Massage device" })),
+    }));
+    const result = await searchLiveCatalog("massage", "Wellness");
+    assert.equal(result.providers[0]?.status, "searched");
+    assert.equal(result.providers[0]?.returned, 4);
+    assert.deepEqual(result.products.map((product) => product.id), [
+      "0851939002067",
+      "0851939002067",
+      "0851939002067",
+      "96385074",
+    ]);
+    assert.match(result.products[0]!.sources[0]!.url, /\/product\/851939002067$/);
+    assert.equal(mergeCatalogProducts([result.products[0]!], result.products).length, 2);
   } finally {
     globalThis.fetch = original;
   }

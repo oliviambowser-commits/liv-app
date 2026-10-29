@@ -1,4 +1,5 @@
 import type { LivProduct, LivSource } from "@workspace/db";
+import { parseBarcode } from "./barcode";
 import { noScores } from "./seed";
 
 export const CATALOG_CATEGORIES = ["All", "Skincare", "Beauty", "Wellness", "Household"] as const;
@@ -86,10 +87,12 @@ function categorize(item: ProviderProduct, provider: Provider["id"]): string {
 }
 
 function toLivProduct(item: ProviderProduct, provider: Provider): LivProduct | null {
-  const id = item.code?.trim();
+  const code = typeof item.code === "string" ? item.code.trim() : "";
+  const barcode = parseBarcode(code);
   const name = item.product_name?.trim();
-  if (!id || !name) return null;
-  const sourceUrl = `${provider.origin}/product/${encodeURIComponent(id)}`;
+  if (typeof barcode === "string" || !name) return null;
+  const id = barcode.canonical;
+  const sourceUrl = `${provider.origin}/product/${encodeURIComponent(code)}`;
   const source: LivSource = {
     label: `${provider.label} product record`,
     url: sourceUrl,
