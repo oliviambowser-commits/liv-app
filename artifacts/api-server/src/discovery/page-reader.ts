@@ -88,7 +88,7 @@ export function robotsAllows(robots: string, path: string): boolean {
   return longest(allowed) >= longest(disallowed);
 }
 
-async function fetchText(start: string, accept: string): Promise<{ text: string; finalUrl: string } | null> {
+export async function fetchPublicText(start: string, accept: string): Promise<{ text: string; finalUrl: string } | null> {
   let current = new URL(start);
   for (let hop = 0; hop <= MAX_REDIRECTS; hop += 1) {
     await assertPublicHttps(current);
@@ -189,16 +189,46 @@ export function extractPageFacts(html: string, pageUrl: string): PageFacts {
   };
 }
 
-export async function readProductPage(rawUrl: string): Promise<PageFacts | null> {
+export type PageRead = PageFacts & { text?: string };
+
+const robotsCache = new Map<string, { text: string | null; at: number }>();
+
+/** Each site's crawler rules, cached for 10 minutes. */
+export async function robotsFor(origin: string): Promise<string | null> {
+  const hit = robotsCache.get(origin);
+  if (hit && Date.now() - hit.at < 600_000) return hit.text;
+  const robots = await fetchPublicText(`${origin}/robots.txt`, "text/plain").catch(() => null);
+  robotsCache.set(origin, { text: robots?.text ?? null, at: Date.now() });
+  return robots?.text ?? null;
+}
+
+/** Visible page text, for extracting details that aren't in structured data. */
+export function htmlToText(html: string, maxChars = 30_000): string {
+  return decodeEntities(
+    html
+      .replace(/<(script|style|noscript|svg|template)[\s\S]*?<\/\1>/gi, " ")
+      .replace(/<br\s*\/?>|<\/(p|div|li|h[1-6]|tr|section)>/gi, "\n")
+      .replace(/<[^>]+>/g, " "),
+  )
+    .replace(/[ \t\f\v]+/g, " ")
+    .replace(/\n\s*\n+/g, "\n")
+    .trim()
+    .slice(0, maxChars);
+}
+
+export async function readProductPage(rawUrl: string, options: { withText?: boolean } = {}): Promise<PageRead | null> {
   try {
     const url = new URL(rawUrl);
-    const robots = await fetchText(`${url.origin}/robots.txt`, "text/plain").catch(() => null);
-    if (robots && !robotsAllows(robots.text, url.pathname)) {
+    const robots = await robotsFor(url.origin);
+    if (robots && !robotsAllows(robots, url.pathname)) {
       logger.info({ host: url.hostname }, "robots.txt disallows reading this page");
       return null;
     }
-    const page = await fetchText(url.toString(), "text/html");
-    return page ? extractPageFacts(page.text, page.finalUrl) : null;
+    const page = await fetchPublicText(url.toString(), "text/html");
+    if (!page) return null;
+    const facts: PageRead = extractPageFacts(page.text, page.finalUrl);
+    if (options.withText) facts.text = htmlToText(page.text);
+    return facts;
   } catch (error) {
     logger.warn({ err: error, url: rawUrl }, "Could not read product page");
     return null;

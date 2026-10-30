@@ -4,6 +4,9 @@ export type AIModel = "gpt-6-luna" | "gpt-6.1-sol";
 // accepts image input in your OpenAI account before shipping.
 export const VISION_MODEL: AIModel = "gpt-6.1-sol";
 
+// Low-cost model for reading text Liv already downloaded (no web search).
+export const EXTRACT_MODEL: AIModel = "gpt-6-luna";
+
 export function chooseModel(question: string, historyLength: number): AIModel {
   const complex =
     historyLength >= 4 ||

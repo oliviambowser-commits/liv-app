@@ -7,6 +7,7 @@ import { estimateOpenAICost, type AIModel } from "../ai/model-router";
 import { noScores } from "../catalog/seed";
 import { hostOf, readProductPage } from "./page-reader";
 import { candidatesSchema, researchSchema, sanitizeCandidates, sanitizeResearch } from "./validate";
+import { normalizeQuery } from "./demand";
 
 const RESEARCH_MODEL: AIModel = "gpt-6.1-sol";
 const CANDIDATE_CACHE_HOURS = 24;
@@ -47,15 +48,33 @@ async function logUsage(provider: AIProvider, route: string, startedAt: number, 
 
 export type CandidateView = DiscoveryCandidate & { id: string };
 
-export async function findCandidates(provider: AIProvider, rawQuery: string): Promise<{ candidates: CandidateView[]; note: string }> {
-  const query = rawQuery.trim().toLowerCase().replace(/\s+/g, " ");
-
-  // Reuse recent results for the same query to save time and cost.
+/** Recent results for the same query, reused for free. */
+export async function cachedCandidates(rawQuery: string, maxAgeHours = CANDIDATE_CACHE_HOURS): Promise<CandidateView[]> {
+  const query = normalizeQuery(rawQuery);
   const recent = await db.select().from(discoveryCandidates)
-    .where(and(eq(discoveryCandidates.query, query), gt(discoveryCandidates.createdAt, new Date(Date.now() - CANDIDATE_CACHE_HOURS * 3_600_000))))
+    .where(and(eq(discoveryCandidates.query, query), gt(discoveryCandidates.createdAt, new Date(Date.now() - maxAgeHours * 3_600_000))))
     .orderBy(desc(discoveryCandidates.createdAt))
     .limit(10);
-  if (recent.length) return { candidates: recent.map((row) => ({ ...row.candidate, id: row.id })), note: "" };
+  return recent.map((row) => ({ ...row.candidate, id: row.id }));
+}
+
+export async function getCandidate(candidateId: string): Promise<DiscoveryCandidate | null> {
+  const [row] = await db.select().from(discoveryCandidates).where(eq(discoveryCandidates.id, candidateId)).limit(1);
+  return row?.candidate ?? null;
+}
+
+/** A page built from this exact product URL recently enough to reuse for free. */
+export async function freshProductForUrl(productUrl: string, maxAgeDays = 30): Promise<LivProduct | null> {
+  const [row] = await db.select().from(livProducts)
+    .where(and(eq(livProducts.productUrl, productUrl), gt(livProducts.updatedAt, new Date(Date.now() - maxAgeDays * 86_400_000))))
+    .limit(1);
+  return row ?? null;
+}
+
+export async function findCandidates(provider: AIProvider, rawQuery: string): Promise<{ candidates: CandidateView[]; note: string }> {
+  const query = normalizeQuery(rawQuery);
+  const recent = await cachedCandidates(rawQuery);
+  if (recent.length) return { candidates: recent, note: "" };
 
   const startedAt = performance.now();
   const tokens = { inputTokens: 0, outputTokens: 0, webSearchCalls: 0 };
@@ -91,9 +110,10 @@ function sourceLabel(url: string, official: boolean) {
 }
 
 export async function buildProductFromCandidate(provider: AIProvider, candidateId: string): Promise<LivProduct | null> {
-  const [row] = await db.select().from(discoveryCandidates).where(eq(discoveryCandidates.id, candidateId)).limit(1);
-  if (!row) return null;
-  const candidate = row.candidate;
+  const candidate = await getCandidate(candidateId);
+  if (!candidate) return null;
+  const fresh = await freshProductForUrl(candidate.productUrl);
+  if (fresh) return fresh;
 
   // 1. Read the product page directly (the brand's own structured data).
   const page = await readProductPage(candidate.productUrl);

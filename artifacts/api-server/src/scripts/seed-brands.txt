@@ -1,0 +1,24 @@
+# Brands Liv builds overnight from their own websites.
+# One brand per line. Adding the website after a "|" is optional but makes it
+# faster and more reliable, for example:  Rhode | rhodeskin.com
+# Lines starting with # are ignored. New brands are picked up on the next run.
+Rhode
+Otherland
+Therabody
+Glossier
+Summer Fridays
+Supergoop
+Tatcha
+Drunk Elephant
+Ilia Beauty
+Saie
+Nécessaire
+La Roche-Posay
+CeraVe
+The Ordinary
+Olaplex
+Brightland
+Seed Health
+Thorne
+Hydro Flask
+Diptyque

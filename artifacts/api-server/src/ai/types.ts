@@ -61,9 +61,14 @@ export type StructuredResearchResult = {
   webSearchCalls: number;
 };
 
+/** Reads text Liv already has (no web search) and returns JSON matching `schema`. */
+export type StructuredExtractRequest = Omit<StructuredResearchRequest, never>;
+export type StructuredExtractResult = { data: unknown; inputTokens: number; outputTokens: number };
+
 export interface AIProvider {
   readonly name: string;
   research(request: ResearchRequest): Promise<ResearchResult>;
   identifyFromImage(request: IdentifyRequest): Promise<IdentifyResult>;
   structuredWebResearch(request: StructuredResearchRequest): Promise<StructuredResearchResult>;
+  structuredExtract(request: StructuredExtractRequest): Promise<StructuredExtractResult>;
 }

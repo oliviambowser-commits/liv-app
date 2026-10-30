@@ -1,4 +1,4 @@
-import { boolean, integer, jsonb, pgTable, real, serial, text, timestamp } from "drizzle-orm/pg-core";
+import { boolean, integer, jsonb, pgTable, primaryKey, real, serial, text, timestamp } from "drizzle-orm/pg-core";
 
 export type LivSource = {
   label: string;
@@ -93,5 +93,32 @@ export const discoveryCandidates = pgTable("discovery_candidates", {
   candidate: jsonb("candidate").$type<DiscoveryCandidate>().notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+// Demand queue: things people searched for that Liv should research overnight.
+export const catalogRequests = pgTable("catalog_requests", {
+  query: text("query").primaryKey(),
+  displayQuery: text("display_query").notNull(),
+  votes: integer("votes").notNull().default(0),
+  // pending, built, or not_found (retried after a week)
+  status: text("status").notNull().default("pending"),
+  firstRequestedAt: timestamp("first_requested_at", { withTimezone: true }).notNull().defaultNow(),
+  lastRequestedAt: timestamp("last_requested_at", { withTimezone: true }).notNull().defaultNow(),
+  lastAttemptAt: timestamp("last_attempt_at", { withTimezone: true }),
+});
+
+// One vote per person per request, so one person can't push their own query up the queue.
+export const catalogRequestVotes = pgTable("catalog_request_votes", {
+  query: text("query").notNull(),
+  clientId: text("client_id").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [primaryKey({ columns: [table.query, table.clientId] })]);
+
+// Daily per-person counts of paid research actions (anonymous app install ID).
+export const clientDailyUsage = pgTable("client_daily_usage", {
+  clientId: text("client_id").notNull(),
+  day: text("day").notNull(),
+  kind: text("kind").notNull(),
+  count: integer("count").notNull().default(0),
+}, (table) => [primaryKey({ columns: [table.clientId, table.day, table.kind] })]);
 
 export type LivProduct = typeof livProducts.$inferSelect;

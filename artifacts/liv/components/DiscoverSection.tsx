@@ -3,7 +3,7 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-nati
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import colors from '../constants/colors';
-import { buildDiscoveredProduct, discoverProducts, type DiscoveryCandidate } from '../lib/catalog';
+import { QueuedForTonightError, buildDiscoveredProduct, discoverProducts, type DiscoveryCandidate } from '../lib/catalog';
 
 const C = colors.light;
 
@@ -11,7 +11,8 @@ type State =
   | { kind: 'idle' }
   | { kind: 'searching' }
   | { kind: 'results'; query: string; candidates: DiscoveryCandidate[]; note: string }
-  | { kind: 'error'; message: string };
+  | { kind: 'error'; message: string }
+  | { kind: 'queued'; message: string };
 
 /**
  * "Find it with Liv": searches the web for any brand or product, lists what it
@@ -22,6 +23,7 @@ export function DiscoverSection({ query }: { query: string }) {
   const [state, setState] = useState<State>({ kind: 'idle' });
   const [building, setBuilding] = useState<string | null>(null);
   const [buildError, setBuildError] = useState('');
+  const [buildQueued, setBuildQueued] = useState('');
   const clean = query.trim();
 
   // Results belong to the query that produced them.
@@ -37,7 +39,8 @@ export function DiscoverSection({ query }: { query: string }) {
       const result = await discoverProducts(clean);
       setState({ kind: 'results', query: clean, candidates: result.candidates, note: result.note });
     } catch (error) {
-      setState({ kind: 'error', message: error instanceof Error ? error.message : 'Liv couldn’t search the web right now.' });
+      if (error instanceof QueuedForTonightError) setState({ kind: 'queued', message: error.message });
+      else setState({ kind: 'error', message: error instanceof Error ? error.message : 'Liv couldn’t search the web right now.' });
     }
   };
 
@@ -45,11 +48,13 @@ export function DiscoverSection({ query }: { query: string }) {
     if (building) return;
     setBuilding(candidate.id);
     setBuildError('');
+    setBuildQueued('');
     try {
       const product = await buildDiscoveredProduct(candidate.id);
       router.push(`/product/${encodeURIComponent(product.id)}`);
     } catch (error) {
-      setBuildError(error instanceof Error ? error.message : 'Liv couldn’t research this product.');
+      if (error instanceof QueuedForTonightError) setBuildQueued(error.message);
+      else setBuildError(error instanceof Error ? error.message : 'Liv couldn’t research this product.');
     } finally {
       setBuilding(null);
     }
@@ -60,17 +65,19 @@ export function DiscoverSection({ query }: { query: string }) {
       <View style={st.ctaIcon}><Feather name="globe" size={18} color={C.primary}/></View>
       <View style={{ flex: 1 }}>
         <Text style={st.ctaTitle}>{clean.length < 2 ? 'Find any brand or product with Liv' : `Find “${clean}” with Liv`}</Text>
-        <Text style={st.ctaCopy}>Liv searches the web and builds a sourced product page.</Text>
+        <Text style={st.ctaCopy}>Liv reads the brand’s own website and builds sourced product pages.</Text>
       </View>
       {state.kind === 'searching' ? <ActivityIndicator color={C.primaryForeground}/> : <Feather name="arrow-right" size={18} color={C.primaryForeground}/>}
     </Pressable>
 
-    {state.kind === 'searching' && <Text style={st.status}>Searching the web. This usually takes 15 to 30 seconds.</Text>}
+    {state.kind === 'searching' && <Text style={st.status}>Reading the brand’s website. This usually takes 15 to 30 seconds.</Text>}
     {state.kind === 'error' && <Text style={[st.status, { color: C.destructive }]}>{state.message}</Text>}
+    {state.kind === 'queued' && <QueuedNote message={state.message}/>}
 
     {state.kind === 'results' && <>
       <Text style={st.heading}>{state.candidates.length ? `What Liv found for “${state.query}”` : `Liv couldn’t find “${state.query}” yet`}</Text>
-      {state.candidates.length === 0 && <Text style={st.status}>{state.note || 'Try the full brand name, or add the product type (for example, “Otherland candle”).'}</Text>}
+      {!!state.note && <Text style={st.status}>{state.note}</Text>}
+      {state.candidates.length === 0 && !state.note && <Text style={st.status}>Try the full brand name, or add the product type (for example, “Otherland candle”).</Text>}
       {state.candidates.map((candidate) => <Pressable key={candidate.id} onPress={() => void open(candidate)} disabled={!!building} accessibilityRole="button" accessibilityLabel={`Build product page for ${candidate.brand} ${candidate.name}`} style={({ pressed }) => [st.row, pressed && { opacity: 0.8 }, !!building && building !== candidate.id && { opacity: 0.5 }]}>
         <View style={{ flex: 1 }}>
           <Text style={st.brand}>{candidate.brand}</Text>
@@ -82,11 +89,18 @@ export function DiscoverSection({ query }: { query: string }) {
       </Pressable>)}
       {!!building && <Text style={st.status}>Liv is reading the product page and checking sources. This can take up to a minute.</Text>}
       {!!buildError && <Text style={[st.status, { color: C.destructive }]}>{buildError}</Text>}
+      {!!buildQueued && <QueuedNote message={buildQueued}/>}
     </>}
   </View>;
 }
 
+function QueuedNote({ message }: { message: string }) {
+  return <View style={st.queued}><Feather name="moon" size={16} color={C.primary}/><Text style={st.queuedText}>{message}</Text></View>;
+}
+
 const st = StyleSheet.create({
+  queued: { flexDirection: 'row', gap: 9, alignItems: 'flex-start', backgroundColor: C.lavender, borderRadius: 14, padding: 12, marginTop: 10 },
+  queuedText: { flex: 1, fontFamily: 'Inter_400Regular', fontSize: 12, lineHeight: 18, color: C.foreground },
   wrap: { marginBottom: 18 },
   cta: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: C.primary, borderRadius: 18, padding: 14 },
   ctaDisabled: { opacity: 0.7 },

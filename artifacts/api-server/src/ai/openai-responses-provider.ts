@@ -7,6 +7,8 @@ import type {
   ResearchRequest,
   ResearchResult,
   SourceCitation,
+  StructuredExtractRequest,
+  StructuredExtractResult,
   StructuredResearchRequest,
   StructuredResearchResult,
 } from "./types";
@@ -195,5 +197,22 @@ export class OpenAIResponsesProvider implements AIProvider {
       outputTokens: response.usage?.output_tokens ?? 0,
       webSearchCalls,
     };
+  }
+
+  async structuredExtract(request: StructuredExtractRequest): Promise<StructuredExtractResult> {
+    const response = await openai.responses.create({
+      model: request.model,
+      instructions: request.instructions,
+      input: request.input,
+      text: { format: { type: "json_schema", name: request.schemaName, strict: true, schema: request.schema } },
+      max_output_tokens: request.maxOutputTokens,
+    });
+    let data: unknown = null;
+    try {
+      data = JSON.parse(response.output_text || "null");
+    } catch {
+      data = null;
+    }
+    return { data, inputTokens: response.usage?.input_tokens ?? 0, outputTokens: response.usage?.output_tokens ?? 0 };
   }
 }

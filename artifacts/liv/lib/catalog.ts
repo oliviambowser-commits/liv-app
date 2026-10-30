@@ -1,4 +1,5 @@
 import { searchCatalogProducts, setBaseUrl } from "@workspace/api-client-react";
+import { getClientId } from "./clientId";
 
 export type CatalogSource = {
   label: string;
@@ -157,13 +158,21 @@ export type DiscoveryCandidate = {
 };
 
 /** Asks Liv to find products for any brand or product name on the web. */
+/** Thrown when today's limit is reached; the request has been queued for tonight. */
+export class QueuedForTonightError extends Error {}
+
+async function researchHeaders() {
+  return { "Content-Type": "application/json", "X-Liv-Client": await getClientId() };
+}
+
 export async function discoverProducts(query: string): Promise<{ candidates: DiscoveryCandidate[]; note: string }> {
   const response = await fetch(apiUrl("/liv/discover"), {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: await researchHeaders(),
     body: JSON.stringify({ query }),
   });
   const result = await response.json().catch(() => ({}));
+  if (response.status === 429 && result.queued) throw new QueuedForTonightError(result.message);
   if (!response.ok) throw new Error(result.message ?? "Liv couldn't search the web right now.");
   return result as { candidates: DiscoveryCandidate[]; note: string };
 }
@@ -172,10 +181,11 @@ export async function discoverProducts(query: string): Promise<{ candidates: Dis
 export async function buildDiscoveredProduct(candidateId: string): Promise<CatalogProduct> {
   const response = await fetch(apiUrl("/liv/discover/build"), {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: await researchHeaders(),
     body: JSON.stringify({ candidateId }),
   });
   const result = await response.json().catch(() => ({}));
+  if (response.status === 429 && result.queued) throw new QueuedForTonightError(result.message);
   if (!response.ok) throw new Error(result.message ?? "Liv couldn't research this product.");
   return result.product as CatalogProduct;
 }
