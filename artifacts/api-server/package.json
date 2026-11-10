@@ -9,7 +9,8 @@
     "start": "node --enable-source-maps ./dist/index.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "seed:brands": "tsx ./src/scripts/seed-brands.ts",
-    "catalog:import": "tsx ./src/scripts/import-open-data.ts"
+    "catalog:import": "tsx ./src/scripts/import-open-data.ts",
+    "catalog:audit": "tsx ./src/scripts/audit-open-beauty-facts.ts"
   },
   "dependencies": {
     "@workspace/api-zod": "workspace:*",
