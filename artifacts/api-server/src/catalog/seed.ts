@@ -11,6 +11,9 @@ export const noScores: LivProductScore[] = [
     method: "No universal safety score. Requires a verified exact-variant label and a disclosed product-specific assessment method.",
     rationale: "Community-submitted ingredient data is unverified and does not establish safety or individual tolerance.",
     coverage: "Ingredient text only; formula concentrations and package verification unavailable.",
+    confidence: "Not scored",
+    reviewedAt: sourceDate,
+    evidenceSourceUrls: [],
   },
   {
     dimension: "Effectiveness",
@@ -19,6 +22,9 @@ export const noScores: LivProductScore[] = [
     method: "Requires independently sourced evidence about the finished product and a defined outcome.",
     rationale: "Ingredient-level studies do not demonstrate this finished product's effectiveness.",
     coverage: "No product-specific clinical evidence in this pilot.",
+    confidence: "Not scored",
+    reviewedAt: sourceDate,
+    evidenceSourceUrls: [],
   },
   {
     dimension: "Transparency",
@@ -27,6 +33,9 @@ export const noScores: LivProductScore[] = [
     method: "Future score uses a fixed checklist of exact variant, complete label, package size, claim substantiation, and current primary sources.",
     rationale: "The available community listing is not independently confirmed against the exact package.",
     coverage: "Primary-source coverage is incomplete.",
+    confidence: "Not scored",
+    reviewedAt: sourceDate,
+    evidenceSourceUrls: [],
   },
   {
     dimension: "Community Experience",
@@ -35,6 +44,9 @@ export const noScores: LivProductScore[] = [
     method: "Requires an authentic, lawful review corpus with count and date range.",
     rationale: "No verified review corpus is connected to this pilot.",
     coverage: "No authentic product reviews.",
+    confidence: "Not scored",
+    reviewedAt: sourceDate,
+    evidenceSourceUrls: [],
   },
   {
     dimension: "Value",
@@ -43,6 +55,9 @@ export const noScores: LivProductScore[] = [
     method: "Requires current region-specific price and package size from a permitted source.",
     rationale: "No verified comparable price is available.",
     coverage: "Price and unit comparison unavailable.",
+    confidence: "Not scored",
+    reviewedAt: sourceDate,
+    evidenceSourceUrls: [],
   },
 ];
 
@@ -61,7 +76,7 @@ const ceraveSources: LivSource[] = [
     url: "https://www.cerave.com/skincare/moisturizers/moisturizing-cream",
     sourceType: "manufacturer",
     retrievedAt: sourceDate,
-    note: "Brand product description; not an independent efficacy or safety assessment.",
+    note: "Current U.S. manufacturer page for Moisturizing Cream. The page says ingredient lists change and the package label is the most current source. The linked 453 g community barcode has not been matched to a manufacturer package label; the page does not confirm this exact package.",
   },
 ];
 
@@ -80,7 +95,15 @@ const fabSources: LivSource[] = [
     url: "https://www.firstaidbeauty.com/products/ultra-repair-cream",
     sourceType: "manufacturer",
     retrievedAt: sourceDate,
-    note: "Brand product page; product claims are not independent efficacy evidence.",
+    note: "Current manufacturer page for Ultra Repair Cream Intense Hydration lists a 0.5% colloidal-oatmeal skin-protectant claim and a current ingredient list. It differs from the community transcription; the page does not match that barcode to a specific package. Brand claims are not independent efficacy evidence.",
+  },
+  {
+    label: "DailyMed official product label · 6 oz jar",
+    url: "https://dailymed.nlm.nih.gov/dailymed/drugInfo.cfm?setid=beb22d69-8a83-65dc-e053-2a95a90ad812",
+    sourceType: "regulatory_label",
+    retrievedAt: sourceDate,
+    sourceUpdatedAt: "2025-12-08",
+    note: "NLM-hosted OTC label identifies a 170.1 g jar and 0.5% colloidal oatmeal, with multiple NDC package codes. It is manufacturer-submitted labeling, not an FDA efficacy endorsement; no NDC-to-community-barcode match was confirmed.",
   },
 ];
 
@@ -92,10 +115,10 @@ const fabEvidence: LivEvidence[] = [
     sourceType: "scientific_literature",
     retrievedAt: sourceDate,
     studyDesign: "Two single-center, single-arm clinical studies",
-    confidence: "Limited for applying the findings to other formulas",
+    confidence: "Limited: two single-center, single-arm studies; different 1% concentration and not this product",
     coverage: "1% colloidal oatmeal cream in mild-to-moderate atopic dermatitis",
     summary: "The publication reports two single-center, single-arm clinical studies of a 1% colloidal oatmeal cream in people with mild-to-moderate atopic dermatitis.",
-    limitation: "Ingredient-level evidence only; it does not test this product or establish results for an individual.",
+    limitation: "Ingredient-level evidence only. The current FAB label reports 0.5% colloidal oatmeal, while these studies evaluated a 1% cream; this does not establish finished-product effectiveness or individual results.",
   },
 ];
 

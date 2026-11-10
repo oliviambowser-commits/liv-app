@@ -290,12 +290,28 @@ function SourcedProductDetail({ id }: { id: string }) {
     {!!product.details?.some((item) => !item.sourceUrl) && <View style={s.unknownCard}><Feather name="help-circle" size={18} color={C.primary}/><View style={{flex:1}}><Txt style={s.unknownTitle}>What Liv couldn’t find</Txt>{product.details.filter((item) => !item.sourceUrl).map((item, index) => <Txt key={index} style={s.consentCopy}>{item.value}</Txt>)}</View></View>}
     {staleSources.length > 0 && <View style={s.unknownCard}><Feather name="clock" size={18} color={C.primary}/><Txt style={[s.consentCopy,{flex:1}]}>A source record is over six months old. Treat its product details as potentially outdated until the current package is checked.</Txt></View>}
     <SectionTitle>Liv’s breakdown</SectionTitle><Txt style={s.subtleDisclaimer}>Separate dimensions · no combined score. Numbers appear only when the evidence supports the method.</Txt>
-    {product.scores.map((score) => <View key={score.dimension} style={s.scoreRow}><View style={s.scoreTop}><Txt style={s.scoreName}>{score.dimension}</Txt><Txt style={s.scoreMeta}>{score.value == null ? 'Not enough information' : `${score.value}/100`}</Txt></View>{score.value != null && <View style={s.scoreTrack}><View style={[s.scoreFill,{width:`${score.value}%`}]}/></View>}<Txt style={s.scoreRationale}>{score.rationale}</Txt><Txt style={s.scoreMeta}>Method: {score.method}</Txt><Txt style={s.scoreMeta}>Coverage: {score.coverage}</Txt></View>)}
+    {product.scores.map((score) => {
+      const scoreSources = score.evidenceSourceUrls.map((url) => ({
+        url,
+        label: product.sources.find((source) => source.url === url)?.label
+          ?? product.ingredientEvidence.find((evidence) => evidence.url === url)?.title
+          ?? "Open score evidence",
+      }));
+      return <View key={score.dimension} style={s.scoreRow}>
+        <View style={s.scoreTop}><Txt style={s.scoreName}>{score.dimension}</Txt><Txt style={s.scoreMeta}>{score.value == null ? 'Not enough information' : `${score.value}/100`}</Txt></View>
+        {score.value != null && <View style={s.scoreTrack}><View style={[s.scoreFill,{width:`${score.value}%`}]}/></View>}
+        <Txt style={s.scoreRationale}>{score.rationale}</Txt>
+        <Txt style={s.scoreMeta}>Method: {score.method}</Txt>
+        <Txt style={s.scoreMeta}>Coverage: {score.coverage}</Txt>
+        <Txt style={s.scoreMeta}>Confidence: {score.confidence} · Reviewed {score.reviewedAt}</Txt>
+        {scoreSources.map(({url,label}) => <Pressable key={url} onPress={() => Linking.openURL(url)}><Txt style={s.smallLink}>{label} ↗</Txt></Pressable>)}
+      </View>;
+    })}
     <View style={s.ratingUnavailable}><Feather name="star" size={17} color={C.primary}/><Txt style={s.consentCopy}>Community rating: not available. This pilot has no verified review source or Liv member reviews.</Txt></View>
     <SectionTitle>Ingredients or materials</SectionTitle><Txt style={s.subtleDisclaimer}>{product.sourceStatus === 'ai_web_research_unverified' || product.sourceStatus === 'brand_website' ? 'As published on the cited page; not a verified formula or safety assessment.' : 'Raw text from the cited community database; not a verified formula or safety assessment.'}</Txt>
     <View style={s.ingredientCard}><Txt style={s.ingredientNote}>{product.ingredientsText || 'Liv hasn’t found a published ingredient or materials list for this product yet.'}</Txt></View>
     {!!product.ingredientEvidence.length && <><SectionTitle>Ingredient-level research</SectionTitle>{product.ingredientEvidence.map((item) => <View key={item.url} style={s.ingredientCard}><Txt style={s.ingredientName}>{item.ingredient}: {item.title}</Txt><Txt style={s.ingredientNote}>{item.summary}</Txt><Txt style={s.scoreMeta}>{item.studyDesign} · Retrieved {item.retrievedAt}</Txt><Txt style={s.scoreMeta}>Coverage: {item.coverage}</Txt><Txt style={s.scoreMeta}>Confidence: {item.confidence}</Txt><Txt style={s.scoreMeta}>{item.limitation}</Txt><Pressable onPress={() => Linking.openURL(item.url)}><Txt style={s.smallLink}>Open PubMed source ↗</Txt></Pressable></View>)}</>}
-    <SectionTitle>Sources</SectionTitle>{product.sources.map((source) => <Pressable key={source.url} onPress={() => Linking.openURL(source.url)} style={s.sourceRow}><View style={{flex:1}}><Txt style={s.postProductName}>{source.label}</Txt><Txt style={s.scoreMeta}>{source.note}</Txt><Txt style={s.scoreMeta}>{source.sourceUpdatedAt ? `Source record last changed ${source.sourceUpdatedAt} · ` : ''}Retrieved ${source.retrievedAt}{source.license ? ` · ${source.license}` : ''}</Txt></View><Feather name="external-link" size={16} color={C.primary}/></Pressable>)}
+    <SectionTitle>Sources</SectionTitle>{product.sources.map((source) => <Pressable key={source.url} onPress={() => Linking.openURL(source.url)} style={s.sourceRow}><View style={{flex:1}}><Txt style={s.postProductName}>{source.label}</Txt><Txt style={s.scoreMeta}>Source type: {source.sourceType.replaceAll('_', ' ')}</Txt><Txt style={s.scoreMeta}>{source.note}</Txt><Txt style={s.scoreMeta}>{source.sourceUpdatedAt ? `Source record last changed ${source.sourceUpdatedAt} · ` : ''}Retrieved {source.retrievedAt}{source.license ? ` · ${source.license}` : ''}</Txt></View><Feather name="external-link" size={16} color={C.primary}/></Pressable>)}
     <Txt style={s.verified}>Record last updated: {new Date(product.updatedAt).toLocaleDateString()}</Txt>
   </Page>;
 }

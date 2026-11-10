@@ -15,15 +15,58 @@ const liveSearchLimiter = rateLimit({
   legacyHeaders: false,
   message: { message: "Live catalog search is temporarily limited. Please try again in a minute." },
 });
+const requiredDimensions = [
+  "Ingredients & Safety",
+  "Effectiveness",
+  "Transparency",
+  "Community Experience",
+  "Value",
+];
+
+function assertScoreEvidence(product: { id: string; scores: typeof seedProducts[number]["scores"]; sources: typeof seedProducts[number]["sources"]; ingredientEvidence: typeof seedProducts[number]["ingredientEvidence"] }) {
+  const dimensions = product.scores.map((score) => score.dimension);
+  if (requiredDimensions.some((dimension) => !dimensions.includes(dimension)) || new Set(dimensions).size !== requiredDimensions.length) {
+    throw new Error(`Product ${product.id} must have exactly one score record for each required dimension.`);
+  }
+
+  for (const score of product.scores) {
+    if (score.status === "insufficient_evidence") {
+      if (score.value !== null) throw new Error(`Unavailable score ${product.id}/${score.dimension} must not contain a number.`);
+      continue;
+    }
+
+    const citedUrls = new Set([
+      ...product.sources.map((source) => source.url),
+      ...product.ingredientEvidence.map((evidence) => evidence.url),
+    ]);
+    if (
+      score.value === null ||
+      score.value < 1 ||
+      score.value > 100 ||
+      !score.method.trim() ||
+      !score.rationale.trim() ||
+      !score.coverage.trim() ||
+      !score.confidence.trim() ||
+      score.confidence === "Not scored" ||
+      !Number.isFinite(Date.parse(score.reviewedAt)) ||
+      score.evidenceSourceUrls.length === 0 ||
+      score.evidenceSourceUrls.some((url) => !citedUrls.has(url))
+    ) {
+      throw new Error(`Available score ${product.id}/${score.dimension} is missing valid cited evidence or required metadata.`);
+    }
+  }
+}
 
 async function ensurePilotSeeded() {
   if (!seedPromise) {
+    seedProducts.forEach(assertScoreEvidence);
     seedPromise = db.insert(livProducts).values(seedProducts)
       .onConflictDoUpdate({
         target: livProducts.id,
         set: {
           sources: sql`excluded.sources`,
           ingredientEvidence: sql`excluded.ingredient_evidence`,
+          scores: sql`excluded.scores`,
         },
       })
       .then(() => undefined)
@@ -67,6 +110,7 @@ router.get("/catalog/products", (req, res, next) => {
       .orderBy(asc(livProducts.brand), asc(livProducts.name))
       .offset((page - 1) * 25)
       .limit(25);
+    products.forEach(assertScoreEvidence);
 
     if (req.query.live !== "true") {
       res.json({
@@ -81,8 +125,10 @@ router.get("/catalog/products", (req, res, next) => {
       return;
     }
     const live = await searchLiveCatalog(query, category, page);
+    const combinedProducts = mergeCatalogProducts(products, live.products).slice(0, 35);
+    combinedProducts.forEach(assertScoreEvidence);
     res.json({
-      products: mergeCatalogProducts(products, live.products).slice(0, 35),
+      products: combinedProducts,
       providers: live.providers,
       coverageNotice: "Live community-database results are incomplete and not independently verified. Open the source record before relying on product details.",
     });
@@ -97,6 +143,7 @@ router.get("/catalog/products/:id", async (req, res, next) => {
     const id = String(req.params.id).trim();
     const [product] = await db.select().from(livProducts).where(eq(livProducts.id, id)).limit(1);
     if (product) {
+      assertScoreEvidence(product);
       res.json({ product });
       return;
     }
@@ -104,6 +151,7 @@ router.get("/catalog/products/:id", async (req, res, next) => {
     if (typeof parsed !== "string") {
       const match = await findProductByBarcode(parsed);
       if (match) {
+        assertScoreEvidence(match.product);
         res.json({ product: match.product });
         return;
       }
@@ -121,7 +169,6 @@ const barcodeLimiter = rateLimit({
   legacyHeaders: false,
   message: { message: "Too many lookups at once. Please wait a moment and scan again." },
 });
-
 router.get("/catalog/barcode/:code", barcodeLimiter, async (req, res, next) => {
   try {
     await ensurePilotSeeded();
@@ -139,6 +186,7 @@ router.get("/catalog/barcode/:code", barcodeLimiter, async (req, res, next) => {
       res.status(404).json({ match: "not_found", barcode: parsed.canonical, message: "No product record matches this barcode yet." });
       return;
     }
+    assertScoreEvidence(match.product);
     // "confirmed" describes the identity match (this exact barcode), not the
     // accuracy of the product data, which sourceStatus still describes.
     res.json({ product: match.product, match: "confirmed", source: match.source });

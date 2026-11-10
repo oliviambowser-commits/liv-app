@@ -1,0 +1,30 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "3_CskjjlVWTlVpTgz6ha_"
+uri = "file://generated-artifacts/liv-preview/search.jpg"
+type = "image"
+title = "Liv mobile preview · Search"
+description = "Working Expo Search screen showing the sourced pilot records separately from illustrative demo products."
+logical_id = "47400b5c-5506-4ebe-bc85-c204dc828765"
+content_hash = "sha256:4d19bc632d640dfccd809fe14c4563ebedfa2b3083634ab6f2dfbc410e91c9e6"
+size = 38170
+mtime_ms = 1793231852985
+storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:a9fb3851-435b-4a26-8110-c0d497c67aa2/47400b5c-5506-4ebe-bc85-c204dc828765/7ee25c69-b625-40d1-8e44-f648d10fe5f6"
+storage_version_token = "1793231900724394"
+content_type = "image/jpeg"
+
+[[outputs]]
+id = "daMcaJNgThaJCm3Kv6Ac4"
+uri = "file://generated-artifacts/liv-preview/product-detail.jpg"
+type = "image"
+title = "Liv mobile preview · Product detail"
+description = "Working Expo product detail showing the unresolved barcode match and unavailable skincare dimensions."
+logical_id = "bb003aaa-8af2-4e45-b82f-6a34862049c2"
+content_hash = "sha256:4de289cfc406975d6e575f29bb0f2e8e01b4334187d465527f06ac60916aedf6"
+size = 51786
+mtime_ms = 1793231855873
+storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:a9fb3851-435b-4a26-8110-c0d497c67aa2/bb003aaa-8af2-4e45-b82f-6a34862049c2/123940cd-63f5-455e-867d-628dbfb4a2bf"
+storage_version_token = "1793231901223175"
+content_type = "image/jpeg"

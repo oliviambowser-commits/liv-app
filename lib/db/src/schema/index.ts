@@ -3,7 +3,7 @@ import { boolean, integer, jsonb, pgTable, primaryKey, real, serial, text, times
 export type LivSource = {
   label: string;
   url: string;
-  sourceType: "community_database" | "manufacturer" | "scientific_literature" | "web_research";
+  sourceType: "community_database" | "manufacturer" | "regulatory_label" | "scientific_literature" | "web_research";
   license?: string;
   retrievedAt: string;
   sourceUpdatedAt?: string;
@@ -30,6 +30,9 @@ export type LivProductScore = {
   method: string;
   rationale: string;
   coverage: string;
+  confidence: string;
+  reviewedAt: string;
+  evidenceSourceUrls: string[];
 };
 
 /** One researched fact shown on a product page, always tied to its source. */
