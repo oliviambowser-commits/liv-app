@@ -3,7 +3,7 @@ import { boolean, integer, jsonb, pgTable, primaryKey, real, serial, text, times
 export type LivSource = {
   label: string;
   url: string;
-  sourceType: "community_database" | "manufacturer" | "regulatory_label" | "scientific_literature" | "web_research";
+  sourceType: "community_database" | "manufacturer" | "regulatory_label" | "government_certification" | "scientific_literature" | "web_research";
   license?: string;
   retrievedAt: string;
   sourceUpdatedAt?: string;
@@ -70,7 +70,46 @@ export const livProducts = pgTable("liv_products", {
   productUrl: text("product_url"),
   summary: text("summary"),
   details: jsonb("details").$type<LivDetail[]>().notNull().default([]),
+  // Which source owns this row's display data (open_beauty, openfda, epa_safer_choice, ...).
+  // Imports only ever update rows they own, so sources are never blended together.
+  primarySource: text("primary_source"),
+  // confirmed (tagged as sold in the US), likely (US barcode or US retailer), possible, or null.
+  usRelevance: text("us_relevance"),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+// Each source's record of a product, exactly as received and never edited.
+// Keeps open-license data (ODbL) separate from Liv's own data and records
+// what every source says, even when another source owns the product row.
+export const sourceRecords = pgTable("source_records", {
+  source: text("source").notNull(),
+  sourceKey: text("source_key").notNull(),
+  productId: text("product_id"),
+  license: text("license").notNull(),
+  payload: jsonb("payload").$type<Record<string, unknown>>().notNull(),
+  fingerprint: text("fingerprint").notNull(),
+  // active, or not_listed when a refresh no longer finds it (never deleted)
+  status: text("status").notNull().default("active"),
+  firstSeenAt: timestamp("first_seen_at", { withTimezone: true }).notNull().defaultNow(),
+  lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [primaryKey({ columns: [table.source, table.sourceKey] })]);
+
+// One row per import run, for progress tracking, refresh scheduling, and rollback.
+export const ingestionRuns = pgTable("ingestion_runs", {
+  id: serial("id").primaryKey(),
+  source: text("source").notNull(),
+  status: text("status").notNull().default("running"),
+  dryRun: boolean("dry_run").notNull().default(false),
+  read: integer("read").notNull().default(0),
+  added: integer("added").notNull().default(0),
+  updated: integer("updated").notNull().default(0),
+  unchanged: integer("unchanged").notNull().default(0),
+  rejected: integer("rejected").notNull().default(0),
+  notListed: integer("not_listed").notNull().default(0),
+  rejectReasons: jsonb("reject_reasons").$type<Record<string, number>>().notNull().default({}),
+  error: text("error"),
+  startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
+  finishedAt: timestamp("finished_at", { withTimezone: true }),
 });
 
 export const aiUsageEvents = pgTable("ai_usage_events", {

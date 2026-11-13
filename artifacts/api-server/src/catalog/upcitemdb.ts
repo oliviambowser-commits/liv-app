@@ -84,6 +84,8 @@ function toLivProduct(item: UpcItem, canonicalId: string): LivProduct | null {
     productUrl: null,
     summary: null,
     details: [],
+    primarySource: null,
+    usRelevance: null,
     updatedAt: new Date(),
   };
 }

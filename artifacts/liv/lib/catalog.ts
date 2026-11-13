@@ -4,7 +4,7 @@ import { getClientId } from "./clientId";
 export type CatalogSource = {
   label: string;
   url: string;
-  sourceType: "community_database" | "manufacturer" | "regulatory_label" | "scientific_literature" | "web_research";
+  sourceType: "community_database" | "manufacturer" | "regulatory_label" | "scientific_literature" | "web_research" | "regulatory_label" | "government_certification";
   license?: string;
   retrievedAt: string;
   sourceUpdatedAt?: string;
@@ -56,6 +56,8 @@ export type CatalogProduct = {
   productUrl?: string | null;
   summary?: string | null;
   details?: { label: string; value: string; sourceUrl: string }[];
+  primarySource?: string | null;
+  usRelevance?: "confirmed" | "likely" | "possible" | null;
   updatedAt: string;
 };
 

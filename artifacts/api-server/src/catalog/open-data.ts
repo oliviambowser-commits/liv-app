@@ -59,25 +59,45 @@ type RawRecord = {
   categories_tags?: unknown;
   image_front_url?: unknown;
   image_url?: unknown;
-  images?: Record<string, { rev?: unknown } | undefined>;
+  images?: Record<string, unknown>;
   last_modified_t?: unknown;
 };
 
 const str = (value: unknown, max: number) => (typeof value === "string" && value.trim() ? value.trim().slice(0, max) : null);
 
-/** Image folder layout used by the Open Facts image servers (e.g. 360/600/053/7422). */
+/**
+ * Image folder layout used by the Open Facts image servers. Codes shorter than
+ * 13 digits are padded to 13 first: 3606000537422 -> 360/600/053/7422.
+ */
 export function imageFolder(code: string): string {
-  return code.length > 8 ? `${code.slice(0, 3)}/${code.slice(3, 6)}/${code.slice(6, 9)}/${code.slice(9)}` : code;
+  // 8-digit codes stay as they are; 9 to 12-digit codes are padded to 13.
+  const padded = code.length > 8 && code.length < 13 && /^\d+$/.test(code) ? code.padStart(13, "0") : code;
+  return padded.length > 8 ? `${padded.slice(0, 3)}/${padded.slice(3, 6)}/${padded.slice(6, 9)}/${padded.slice(9)}` : padded;
 }
 
-function frontImage(record: RawRecord, source: OpenSource, code: string): string | null {
+type ImageRef = { rev?: unknown };
+
+/**
+ * The front-of-package photo. Handles the export's ready-made URL, the older
+ * image layout (images.front_en.rev), and the newer one
+ * (images.selected.front.en.rev). English first, then any language.
+ */
+export function frontImage(record: RawRecord, source: OpenSource, code: string): string | null {
   for (const value of [record.image_front_url, record.image_url]) {
     if (typeof value === "string" && value.startsWith("https://")) return value;
   }
-  const images = record.images ?? {};
-  const key = ["front_en", "front"].find((name) => images[name]?.rev != null) ?? Object.keys(images).find((name) => name.startsWith("front_") && images[name]?.rev != null);
-  if (!key) return null;
-  return `${source.imageHost}/images/products/${imageFolder(code)}/${key}.${String(images[key]!.rev)}.400.jpg`;
+  const images = (record.images ?? {}) as Record<string, unknown>;
+  const url = (lang: string, rev: unknown) => `${source.imageHost}/images/products/${imageFolder(code)}/front_${lang}.${String(rev)}.400.jpg`;
+  const selected = (images["selected"] as { front?: Record<string, ImageRef> } | undefined)?.front;
+  if (selected && typeof selected === "object") {
+    const lang = ["en", ...Object.keys(selected)].find((key) => selected[key]?.rev != null);
+    if (lang) return url(lang, selected[lang]!.rev);
+  }
+  const legacy = images as Record<string, ImageRef | undefined>;
+  const key = ["front_en", ...Object.keys(legacy).filter((name) => /^front_[a-z]{2}$/.test(name))].find((name) => legacy[name]?.rev != null);
+  if (key) return url(key.slice(6), legacy[key]!.rev);
+  if (legacy["front"]?.rev != null) return `${source.imageHost}/images/products/${imageFolder(code)}/front.${String(legacy["front"]!.rev)}.400.jpg`;
+  return null;
 }
 
 function categoryFor(record: RawRecord, source: OpenSource): string {
