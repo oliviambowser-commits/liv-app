@@ -2,3 +2,4 @@
 - [Liv catalog scope](liv-catalog-scope.md) — US skincare, beauty, wellness devices/products, and household; source coverage must be disclosed rather than claimed exhaustive.
 - [Orval workspace barrels](orval-workspace-barrels.md) — Filter conflicting workspace re-exports instead of disabling generated type indexes.
 - [Liv product discovery and evidence](liv-product-evidence.md) — scale to millions with sourced partial profiles; photos are fallback and unsupported scores stay off.
+- [Catalog worker deployment](catalog-worker-deployment.md) — Use a separate scheduled worker project; preserve Liv's Autoscale API and explicitly select its production catalog.

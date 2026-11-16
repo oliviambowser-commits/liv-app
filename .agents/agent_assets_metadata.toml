@@ -70,3 +70,17 @@ mtime_ms = 1794853024792
 storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:a9fb3851-435b-4a26-8110-c0d497c67aa2/803047e8-0134-44c2-bbd2-9d415da1773d/f91fbfba-f462-4700-9312-b26cde1464af"
 storage_version_token = "1794853054043735"
 content_type = "text/plain"
+
+[[outputs]]
+id = "xzj2rJHX2P62eDVffa6lI"
+uri = "file://generated-artifacts/liv-catalog-worker-setup.html"
+type = "html"
+title = "Separate nightly worker setup guide"
+description = "Exact build/run commands, secure database preflight, cron 0 2 * * *, America/Denver timezone, timeout guidance, and final Publishing checklist. Prepared only—not active."
+logical_id = "87bb6ebe-0441-4d69-b88d-37f9906b3a8d"
+content_hash = "sha256:10e55169eb37de0afd094ecc88f2aa05e90d73bccef6c8967c749431558555c8"
+size = 10110
+mtime_ms = 1794853414662
+storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:a9fb3851-435b-4a26-8110-c0d497c67aa2/87bb6ebe-0441-4d69-b88d-37f9906b3a8d/9accff4b-8d15-424a-bc82-a17cb7cd6a06"
+storage_version_token = "1794853475344336"
+content_type = "text/html"
