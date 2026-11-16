@@ -28,3 +28,45 @@ mtime_ms = 1793231855873
 storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:a9fb3851-435b-4a26-8110-c0d497c67aa2/bb003aaa-8af2-4e45-b82f-6a34862049c2/123940cd-63f5-455e-867d-628dbfb4a2bf"
 storage_version_token = "1793231901223175"
 content_type = "image/jpeg"
+
+[[outputs]]
+id = "OuH6wtXnzeI3sAD4XG0LU"
+uri = "file://artifacts/api-server/reports/catalog-sample-2026-11-16.csv"
+type = "table"
+title = "Catalog spot-check spreadsheet"
+description = "300 products, 50 from each of six source-owned catalog groups. Package-match columns are blank for your manual checks; 33 legacy products without a source owner are excluded by the sample command."
+logical_id = "6a5b9e2f-2c49-4ef7-848f-8c72586d0698"
+content_hash = "sha256:f631358b77b1827a323e7b7b02f6f93e5278d1a407b61a9021386e0ed19511f3"
+size = 95066
+mtime_ms = 1794852936987
+storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:a9fb3851-435b-4a26-8110-c0d497c67aa2/6a5b9e2f-2c49-4ef7-848f-8c72586d0698/393c7786-9fea-414c-b24d-5cc1044357cd"
+storage_version_token = "1794853053062574"
+content_type = "text/csv"
+
+[[outputs]]
+id = "Or2CE6IAAi3znaBYw1cmM"
+uri = "file://artifacts/api-server/reports/catalog-spot-check-findings-2026-11-16.csv"
+type = "table"
+title = "18 source checks and findings"
+description = "Three sampled products per catalog source, checked against live original records. Includes source links and scope, categorization, identifier, and variant cautions. Physical packages were not verified."
+logical_id = "1795bb54-b7be-456d-96ca-6aec6d4d82f8"
+content_hash = "sha256:d0f102ad6d1f87b9531c30de8c2fbdbd359f037ac229e3ffa68d645c0de12708"
+size = 9681
+mtime_ms = 1794853024791
+storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:a9fb3851-435b-4a26-8110-c0d497c67aa2/1795bb54-b7be-456d-96ca-6aec6d4d82f8/c77f7b1a-b23e-48f3-aeb9-f9487e8c6c3b"
+storage_version_token = "1794853053639811"
+content_type = "text/csv"
+
+[[outputs]]
+id = "hiwML7P06NZ3Zxrj7Mbpr"
+uri = "file://artifacts/api-server/reports/open-food-nonfood-full-output-2026-11-16.txt"
+type = "text"
+title = "Full Open Food Facts scan output"
+description = "Complete captured output of the successful development-catalog scan."
+logical_id = "803047e8-0134-44c2-bbd2-9d415da1773d"
+content_hash = "sha256:34bfe696d245a8db926f13636b7821ed283f1ae88e5bec78dc45ebb4729bfbfa"
+size = 1551
+mtime_ms = 1794853024792
+storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:a9fb3851-435b-4a26-8110-c0d497c67aa2/803047e8-0134-44c2-bbd2-9d415da1773d/f91fbfba-f462-4700-9312-b26cde1464af"
+storage_version_token = "1794853054043735"
+content_type = "text/plain"
