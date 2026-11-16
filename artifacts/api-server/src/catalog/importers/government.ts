@@ -43,7 +43,9 @@ export function mapSaferChoice(raw: Record<string, unknown>, retrievedAt: string
   const company = row["company_name"];
   if (!name) return { reason: "missing_name" };
   const barcode = firstBarcode(row["gtin"], row["upc"]);
-  const id = barcode ?? `epa-${slug(company ?? "unknown")}-${slug(name)}`;
+  // No barcode: company + name, plus the part number when there is one, so
+  // different sizes or variants of a product stay separate products.
+  const id = barcode ?? `epa-${slug(company ?? "unknown")}-${slug(name)}${row["mpn"] ? `-${slug(row["mpn"]).slice(0, 30)}` : ""}`;
   const collection = matchCollection([`${row["category"] ?? ""} ${row["sector"] ?? ""}`.toLowerCase().replace(/\s+/g, "-")], name);
   const productUrl = row["product_url"]?.startsWith("http") ? row["product_url"] : null;
   const disinfectant = /dfe|design for the environment/i.test(row["program"] ?? "");

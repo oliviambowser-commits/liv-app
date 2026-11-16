@@ -22,6 +22,16 @@ test("Open Facts import keeps confirmed and likely US products and labels the ti
   assert.deepEqual(mapForImport({ code: "3606000537423", product_name: "X" }, OPEN_SOURCES.beauty, new Set(tiers)), { reason: "barcode_invalid_check_digit" });
 });
 
+test("product names are found in any language field", async () => {
+  const { anyProductName } = await import("../funnel");
+  assert.equal(anyProductName({ product_name_fr: "Crème hydratante" }), "Crème hydratante");
+  assert.equal(anyProductName({ product_name: "", product_name_es: "Crema", product_name_en: "Cream" }), "Cream", "English first");
+  assert.equal(anyProductName({ product_name_xyz: "nope" }), null);
+  const result = mapForImport({ code: "0851939002067", product_name_es: "Crema Reparadora", countries_tags: ["en:united-states"] }, OPEN_SOURCES.beauty, new Set(tiers));
+  assert.ok("product" in result && result.product.name === "Crema Reparadora");
+  assert.ok("sourceRow" in result && result.sourceRow.payload["product_name_es"] === "Crema Reparadora", "the source record keeps the field it came from");
+});
+
 test("Open Food Facts import takes only non-food items that fit a Liv collection", () => {
   const food = mapForImport({ code: "0851939002067", product_name: "Peanut Butter", countries_tags: ["en:united-states"], categories_tags: ["en:spreads"] }, OPEN_SOURCES.food, new Set(tiers));
   assert.deepEqual(food, { reason: "food_item" });
@@ -84,6 +94,9 @@ test("EPA Safer Choice rows map with barcode, certification, and fragrance-free 
   const noCode = mapSaferChoice({ "PRODUCT NAME": "All Purpose Cleaner", "COMPANY NAME": "Acme" }, "2026-11-13");
   assert.ok("product" in noCode && noCode.product.id === "epa-acme-all-purpose-cleaner" && noCode.product.matchConfidence === "probable");
   assert.deepEqual(mapSaferChoice({ CATEGORY: "x" }, "x"), { reason: "missing_name" });
+  const small = mapSaferChoice({ "PRODUCT NAME": "Dish Soap", "COMPANY NAME": "Acme", MPN: "DS-16OZ" }, "x");
+  const large = mapSaferChoice({ "PRODUCT NAME": "Dish Soap", "COMPANY NAME": "Acme", MPN: "DS-64OZ" }, "x");
+  assert.ok("product" in small && "product" in large && small.product.id !== large.product.id, "sizes without barcodes stay separate");
 });
 
 test("ENERGY STAR air cleaners keep published specs and skip blank ones", () => {

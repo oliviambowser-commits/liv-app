@@ -40,6 +40,8 @@ export function mapForImport(record: FunnelRecord, source: OpenSource, tiers: Se
   if (!mapped) return { reason: "unmappable" };
   const payload: Record<string, unknown> = {};
   for (const field of KEPT_FIELDS) if ((record as Record<string, unknown>)[field] !== undefined) payload[field] = (record as Record<string, unknown>)[field];
+  // Keep whichever language field the name came from.
+  for (const [field, value] of Object.entries(record)) if (/^product_name_[a-z]{2}$/.test(field) && value) payload[field] = value;
   return {
     product: { ...mapped, primarySource: sourceName(source.key), usRelevance: classified.usRelevance },
     sourceRow: { sourceKey: mapped.id, productId: mapped.id, payload },

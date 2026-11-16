@@ -8,6 +8,8 @@ import { parseBarcode } from "./gtin";
 export type UsRelevance = "confirmed" | "likely" | "possible" | "not_us";
 
 export type FunnelRecord = {
+  // Language-specific fields such as product_name_fr.
+  [field: string]: unknown;
   code?: unknown;
   product_name?: unknown;
   product_name_en?: unknown;
@@ -104,7 +106,7 @@ export function classifyRecord(record: FunnelRecord, usBrands?: Set<string>): Cl
   else if (parsed.canonical.length === 13 && isStoreInternal(parsed.canonical)) barcodeProblem = "store_internal";
   else barcode = parsed.canonical;
 
-  const name = text(record.product_name_en) ?? text(record.product_name);
+  const name = anyProductName(record as Record<string, unknown>);
   const brand = text(record.brands)?.split(",")[0]?.trim().toLowerCase() || null;
   const countries = tags(record.countries_tags);
   const countryTagged = countries.includes("en:united-states") ? "us" : countries.length ? "other" : "none";
@@ -136,6 +138,20 @@ export function classifyRecord(record: FunnelRecord, usBrands?: Set<string>): Cl
     hasIngredients: (text(record.ingredients_text_en) ?? text(record.ingredients_text) ?? "").length >= 10,
     hasImage: !!text(record.image_front_url) || images.some((key) => key.startsWith("front")),
   };
+}
+
+/**
+ * The product's name: English first, then the default field, then any
+ * language-specific field (product_name_fr, product_name_es, ...).
+ */
+export function anyProductName(record: Record<string, unknown>): string | null {
+  const pick = (value: unknown) => (typeof value === "string" && value.trim() ? value.trim() : null);
+  const direct = pick(record["product_name_en"]) ?? pick(record["product_name"]);
+  if (direct) return direct;
+  for (const [key, value] of Object.entries(record)) {
+    if (/^product_name_[a-z]{2}$/.test(key) && pick(value)) return pick(value);
+  }
+  return null;
 }
 
 /** Normalized brand + name, to spot the same product listed under several barcodes. */

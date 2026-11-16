@@ -1,6 +1,7 @@
 import type { LivSource } from "@workspace/db";
 import { noScores } from "./seed";
 import { parseBarcode } from "./gtin";
+import { anyProductName } from "./funnel";
 
 /**
  * Free bulk import from the Open Facts databases. Their full exports are
@@ -116,7 +117,7 @@ export function mapOpenFactsRecord(record: RawRecord, source: OpenSource, countr
   if (country && !countries.includes(country)) return null;
   const parsed = typeof record.code === "string" ? parseBarcode(record.code) : "invalid_format";
   if (typeof parsed === "string") return null;
-  const name = str(record.product_name_en, 160) ?? str(record.product_name, 160);
+  const name = anyProductName(record as Record<string, unknown>)?.slice(0, 160) ?? null;
   if (!name) return null;
   const code = parsed.candidates.find((item) => item === record.code) ?? parsed.canonical;
   const imageUrl = frontImage(record, source, code);

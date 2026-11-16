@@ -28,6 +28,10 @@ test("imports never overwrite another source's product, skip unchanged data, and
     await db.insert(livProducts).values([
       { ...base, id: "0851939002067", brand: "Old", name: "Old OBF name", sourceStatus: "community_submitted_unverified" },
       { ...base, id: "3606000537422", brand: "Brand Co", name: "Read from brand site", sourceStatus: "brand_website", primarySource: "brand_site" },
+      // An older Open Beauty Facts row that Liv later enriched from the brand's page.
+      { ...base, id: "0073610000029", brand: "Enriched", name: "Enriched record", sourceStatus: "community_submitted_unverified",
+        sources: [{ label: "brand page", url: "https://brand.example/p", sourceType: "manufacturer", retrievedAt: "2026-11-01", note: "" }],
+        details: [{ label: "Scent", value: "Fig", sourceUrl: "https://brand.example/p" }] },
     ]);
 
     // Open Beauty Facts: adopts its own legacy row, leaves the brand-site row alone.
@@ -37,12 +41,16 @@ test("imports never overwrite another source's product, skip unchanged data, and
       { code: "3606000537422", product_name: "OBF version", brands: "CeraVe", countries_tags: ["en:united-states"] },
       { code: "012345678905", product_name: "Daily Body Wash", brands: "Dove" },
       { code: "3337875597197", product_name: "Gel douche", countries_tags: ["en:france"] },
+      { code: "0073610000029", product_name: "OBF would overwrite this", countries_tags: ["en:united-states"] },
     ]);
     process.env["CATALOG_FILE_BEAUTY"] = file;
     const first = await importOpenFacts("beauty", false, log);
     assert.equal(first.added, 1, "the new body wash");
     assert.equal(first.updated, 1, "its own legacy row");
-    assert.equal(first.unchanged, 1, "brand-site row is not its to change");
+    assert.equal(first.unchanged, 2, "brand-site row and the enriched row are not its to change");
+    const [enriched] = await db.select().from(livProducts).where(eq(livProducts.id, "0073610000029"));
+    assert.equal(enriched?.name, "Enriched record", "enriched row untouched");
+    assert.equal(enriched?.details.length, 1);
     const [legacy] = await db.select().from(livProducts).where(eq(livProducts.id, "0851939002067"));
     assert.equal(legacy?.name, "Ultra Repair Cream");
     assert.equal(legacy?.primarySource, "open_beauty");
@@ -53,7 +61,7 @@ test("imports never overwrite another source's product, skip unchanged data, and
     assert.equal(likely?.usRelevance, "likely");
     // But its own record of that product is still kept, unedited.
     const obfRecords = await db.select().from(sourceRecords).where(eq(sourceRecords.source, "open_beauty"));
-    assert.equal(obfRecords.length, 3);
+    assert.equal(obfRecords.length, 4);
 
     // Same file again: nothing changed, nothing rewritten.
     const second = await importOpenFacts("beauty", false, log);
@@ -68,7 +76,7 @@ test("imports never overwrite another source's product, skip unchanged data, and
     const third = await importOpenFacts("beauty", false, log);
     third.notListed = await markNotListed("open_beauty", run.startedAt, false);
     await finishRun(run.id, third, "succeeded");
-    assert.equal(third.notListed, 1);
+    assert.equal(third.notListed, 2, "the body wash and the enriched-row test product both dropped out");
     const [stillThere] = await db.select().from(livProducts).where(eq(livProducts.id, "0012345678905"));
     assert.ok(stillThere, "not deleted");
     const [runRow] = await db.select().from(ingestionRuns).where(eq(ingestionRuns.id, run.id));

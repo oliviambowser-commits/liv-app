@@ -100,19 +100,22 @@ export async function upsertOwnedProducts(rows: ProductRow[], stats: RunStats, d
   if (!rows.length) return;
   const unique = [...new Map(rows.map((row) => [row.id, row])).values()];
   const source = unique[0]!.primarySource;
-  const existing = await db.select({ id: livProducts.id, owner: livProducts.primarySource, status: livProducts.sourceStatus }).from(livProducts)
+  const existing = await db.select({ id: livProducts.id, owner: livProducts.primarySource, status: livProducts.sourceStatus, sources: livProducts.sources, details: livProducts.details }).from(livProducts)
     .where(inArray(livProducts.id, unique.map((row) => row.id)));
   const byId = new Map(existing.map((row) => [row.id, row]));
   const toWrite: ProductRow[] = [];
   for (const row of unique) {
     const current = byId.get(row.id);
     if (!current) { stats.added += 1; toWrite.push(row); continue; }
-    const owns = current.owner === source || (current.owner === null && legacyStatus !== undefined && current.status === legacyStatus);
+    // A legacy row is adopted only if it holds nothing but that source's own data.
+    // Rows Liv enriched (brand pages, research, evidence) are left untouched.
+    const enriched = current.sources.some((item) => item.sourceType !== "community_database") || current.details.length > 0;
+    const owns = current.owner === source || (current.owner === null && legacyStatus !== undefined && current.status === legacyStatus && !enriched);
     if (owns) { stats.updated += 1; toWrite.push(row); } else { stats.unchanged += 1; }
   }
   if (dryRun || !toWrite.length) return;
   const ownedBySource = legacyStatus
-    ? or(eq(livProducts.primarySource, source), and(isNull(livProducts.primarySource), eq(livProducts.sourceStatus, legacyStatus)))
+    ? or(eq(livProducts.primarySource, source), and(isNull(livProducts.primarySource), eq(livProducts.sourceStatus, legacyStatus), sql`${livProducts.details} = '[]'::jsonb`, sql`not exists (select 1 from jsonb_array_elements(${livProducts.sources}) s where s->>'sourceType' <> 'community_database')`))
     : eq(livProducts.primarySource, source);
   await db.insert(livProducts).values(toWrite).onConflictDoUpdate({
     target: livProducts.id,
