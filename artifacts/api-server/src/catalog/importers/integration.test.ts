@@ -23,7 +23,7 @@ test("imports never overwrite another source's product, skip unchanged data, and
   const { noScores } = await import("../seed");
   const log = () => {};
   try {
-    await db.execute(sql`truncate liv_products, source_records, ingestion_runs`);
+    await db.execute(sql`truncate liv_products, source_records, ingestion_runs, product_alerts`);
     const base = { category: "Skincare", sources: [], ingredientEvidence: [], scores: noScores, details: [] };
     await db.insert(livProducts).values([
       { ...base, id: "0851939002067", brand: "Old", name: "Old OBF name", sourceStatus: "community_submitted_unverified" },
@@ -88,7 +88,7 @@ test("imports never overwrite another source's product, skip unchanged data, and
       if (requestUrl.includes("limit=1&") || requestUrl.endsWith("limit=1")) return { total: 2, results: [] };
       return { total: 2, results: [
         { set_id: "set-owned", openfda: { brand_name: ["ULTRA REPAIR SPF 30"], manufacturer_name: ["FAB"], upc: ["0851939002067"] }, purpose: ["Sunscreen"] },
-        { set_id: "set-new", openfda: { brand_name: ["MINERAL SUNSCREEN SPF 50"], manufacturer_name: ["SUN CO"], upc: ["0036000291452"] }, purpose: ["Sunscreen"] },
+        { set_id: "0b1c2d3e-0000-4000-8000-000000000001", openfda: { brand_name: ["MINERAL SUNSCREEN SPF 50"], manufacturer_name: ["SUN CO"], upc: ["0036000291452"] }, purpose: ["Sunscreen"] },
       ] };
     });
     assert.equal(fda.added, 1);
@@ -114,17 +114,59 @@ test("imports never overwrite another source's product, skip unchanged data, and
     const [withImage] = await db.select().from(livProducts).where(eq(livProducts.id, "0036000291452"));
     assert.equal(withImage?.imageUrl, "https://dailymed.nlm.nih.gov/img.jpg");
     assert.match(withImage?.imageAttribution ?? "", /DailyMed/);
-    await db.update(sourceRecords).set({ fingerprint: "force-change" }).where(eq(sourceRecords.sourceKey, "set-new"));
+    await db.update(sourceRecords).set({ fingerprint: "force-change" }).where(eq(sourceRecords.sourceKey, "0b1c2d3e-0000-4000-8000-000000000001"));
     await importOpenFda(false, log, async (requestUrl) => {
       if (!requestUrl.includes("purpose%3A%22sunscreen%22")) return { total: 0, results: [] };
       if (requestUrl.includes("limit=1&") || requestUrl.endsWith("limit=1")) return { total: 1, results: [] };
-      return { total: 1, results: [{ set_id: "set-new", openfda: { brand_name: ["MINERAL SUNSCREEN SPF 50"], manufacturer_name: ["SUN CO"], upc: ["0036000291452"] }, purpose: ["Sunscreen"] }] };
+      return { total: 1, results: [{ set_id: "0b1c2d3e-0000-4000-8000-000000000001", openfda: { brand_name: ["MINERAL SUNSCREEN SPF 50"], manufacturer_name: ["SUN CO"], upc: ["0036000291452"] }, purpose: ["Sunscreen"] }] };
     });
     const [afterRefresh] = await db.select().from(livProducts).where(eq(livProducts.id, "0036000291452"));
     assert.equal(afterRefresh?.imageUrl, "https://dailymed.nlm.nih.gov/img.jpg", "refresh kept the image");
     const again = await addDailyMedImages(false, log, async () => { calls += 1; return []; });
     assert.equal(again.read, 0, "labels already checked aren't asked again");
     assert.equal(calls, 1);
+
+    // Recall notice attaches to the Open Beauty Facts product by barcode, without changing it.
+    const { importRecalls } = await import("./recalls");
+    const { productAlerts } = await import("@workspace/db");
+    const [beforeRecall] = await db.select().from(livProducts).where(eq(livProducts.id, "0851939002067"));
+    const recalls = await importRecalls(false, log, async (requestUrl) => {
+      if (!requestUrl.includes("2026")) return { total: 0, results: [] };
+      if (requestUrl.endsWith("limit=1")) return { total: 2, results: [] };
+      return { total: 2, results: [
+        { recall_number: "D-0001-2026", status: "Ongoing", classification: "Class II", report_date: "20260312", reason_for_recall: "Contamination", openfda: { upc: ["0851939002067"] } },
+        { recall_number: "D-0002-2026", status: "Ongoing", report_date: "20260401", product_description: "Some other product", openfda: { upc: ["0099999999993"] } },
+      ] };
+    }, new Date("2026-11-19"));
+    assert.equal(recalls.added, 1);
+    assert.equal(recalls.rejectReasons["not_in_catalog"], 1);
+    const alerts = await db.select().from(productAlerts).where(eq(productAlerts.productId, "0851939002067"));
+    assert.equal(alerts.length, 1);
+    assert.equal(alerts[0]?.matchedBy, "barcode");
+    const [afterRecall] = await db.select().from(livProducts).where(eq(livProducts.id, "0851939002067"));
+    assert.equal(afterRecall?.updatedAt.getTime(), beforeRecall?.updatedAt.getTime(), "product row untouched");
+
+    // Package size is added to the FDA product and survives the next label refresh.
+    const { addPackageSizes } = await import("./ndc-sizes");
+    const sizes = await addPackageSizes(false, log, async () => [{ package_ndc: "1111-2222-33", description: "1 TUBE in 1 CARTON > 85 g in 1 TUBE" }]);
+    assert.equal(sizes.updated, 1);
+    await db.update(sourceRecords).set({ fingerprint: "force-change-2" }).where(eq(sourceRecords.sourceKey, "0b1c2d3e-0000-4000-8000-000000000001"));
+    await importOpenFda(false, log, async (requestUrl) => {
+      if (!requestUrl.includes("purpose%3A%22sunscreen%22")) return { total: 0, results: [] };
+      if (requestUrl.includes("limit=1&") || requestUrl.endsWith("limit=1")) return { total: 1, results: [] };
+      return { total: 1, results: [{ set_id: "0b1c2d3e-0000-4000-8000-000000000001", openfda: { brand_name: ["MINERAL SUNSCREEN SPF 50"], manufacturer_name: ["SUN CO"], upc: ["0036000291452"] }, purpose: ["Sunscreen"] }] };
+    });
+    const [sized] = await db.select().from(livProducts).where(eq(livProducts.id, "0036000291452"));
+    assert.equal(sized?.quantity, "85 g", "size kept through refresh");
+
+    // Devices import as their own source.
+    const { importDevices } = await import("./devices");
+    const devices = await importDevices(false, log, async (requestUrl) => {
+      if (!requestUrl.includes("massager")) return { total: 0, results: [] };
+      if (requestUrl.endsWith("limit=1")) return { total: 1, results: [] };
+      return { total: 1, results: [{ public_device_record_key: "rec-1", brand_name: "Percussion Massager", company_name: "Wellness Co", is_otc: "true", identifiers: [{ id: "00850012345677", type: "Primary", issuing_agency: "GS1" }], product_codes: [{ name: "Massager, Therapeutic, Electric" }] }] };
+    });
+    assert.equal(devices.added, 1);
 
     // Dry run writes nothing.
     const before = await db.select({ n: sql<number>`count(*)::int` }).from(livProducts);

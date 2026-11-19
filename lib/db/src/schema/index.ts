@@ -3,7 +3,7 @@ import { boolean, integer, jsonb, pgTable, primaryKey, real, serial, text, times
 export type LivSource = {
   label: string;
   url: string;
-  sourceType: "community_database" | "manufacturer" | "regulatory_label" | "government_certification" | "scientific_literature" | "web_research";
+  sourceType: "community_database" | "manufacturer" | "regulatory_label" | "government_certification" | "government_registry" | "scientific_literature" | "web_research";
   license?: string;
   retrievedAt: string;
   sourceUpdatedAt?: string;
@@ -93,6 +93,24 @@ export const sourceRecords = pgTable("source_records", {
   firstSeenAt: timestamp("first_seen_at", { withTimezone: true }).notNull().defaultNow(),
   lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [primaryKey({ columns: [table.source, table.sourceKey] })]);
+
+// Safety notices (such as FDA recalls) linked to any product with a matching
+// barcode or label, whichever source owns the product. Kept separate so they
+// never change the product's own data.
+export const productAlerts = pgTable("product_alerts", {
+  source: text("source").notNull(),
+  alertKey: text("alert_key").notNull(),
+  productId: text("product_id").notNull(),
+  kind: text("kind").notNull(),
+  title: text("title").notNull(),
+  detail: text("detail"),
+  classification: text("classification"),
+  status: text("status"),
+  reportDate: text("report_date"),
+  url: text("url").notNull(),
+  matchedBy: text("matched_by").notNull(),
+  lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [primaryKey({ columns: [table.source, table.alertKey, table.productId] })]);
 
 // One row per import run, for progress tracking, refresh scheduling, and rollback.
 export const ingestionRuns = pgTable("ingestion_runs", {

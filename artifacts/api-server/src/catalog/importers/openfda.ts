@@ -40,13 +40,19 @@ export type OpenFdaLabel = {
 };
 
 /** Each Liv category and the label purpose that identifies it. */
-export const CATEGORY_QUERIES: Array<{ key: string; purpose: string; collection: string; nameFilter?: RegExp }> = [
+export const CATEGORY_QUERIES: Array<{ key: string; purpose: string; collection: string; nameFilter?: RegExp; excludeName?: RegExp }> = [
   { key: "sunscreens", purpose: "sunscreen", collection: "Sunscreens" },
   { key: "toothpastes", purpose: "anticavity", collection: "Toothpastes" },
   { key: "antiperspirants", purpose: "antiperspirant", collection: "Deodorants" },
   { key: "antibacterial-soaps", purpose: "antibacterial", collection: "Hand Soaps", nameFilter: /soap|wash|cleanser/i },
   { key: "antiseptic-soaps", purpose: "antiseptic", collection: "Hand Soaps", nameFilter: /soap|wash|cleanser/i },
   { key: "dandruff", purpose: "dandruff", collection: "Shampoos" },
+  // Added: more over-the-counter products that belong in Liv collections.
+  { key: "scalp-shampoos", purpose: "seborrheic dermatitis", collection: "Shampoos", nameFilter: /shampoo|conditioner|scalp|wash/i },
+  { key: "psoriasis-shampoos", purpose: "psoriasis", collection: "Shampoos", nameFilter: /shampoo|conditioner|scalp/i },
+  { key: "sensitivity-toothpastes", purpose: "antihypersensitivity", collection: "Toothpastes", nameFilter: /toothpaste|dentifrice|paste|gel/i },
+  { key: "acne", purpose: "acne", collection: "Face Cleansers", excludeName: /pad|wipe|patch|pimple patch/i },
+  { key: "skin-protectants", purpose: "skin protectant", collection: "Body Lotions", nameFilter: /lip|hand|body|lotion|cream|balm|butter|moistur/i, excludeName: /diaper|rash|baby|hemorrhoid|anal|nipple|ostomy|wound|zinc oxide paste/i },
 ];
 
 const SKIN = new Set(["Sunscreens", "Face Moisturizers", "Lip Balms", "Face Cleansers", "Face Serums"]);
@@ -179,7 +185,8 @@ export async function importOpenFda(dryRun: boolean, log: (line: string) => void
           stats.read += 1;
           const mapped = mapLabel(label, category.collection, retrievedAt);
           if ("reason" in mapped) { reject(stats, mapped.reason); continue; }
-          if (category.nameFilter && !category.nameFilter.test(mapped.products[0]!.name)) { reject(stats, "not_in_collection"); continue; }
+          const productName = mapped.products[0]!.name;
+          if ((category.nameFilter && !category.nameFilter.test(productName)) || category.excludeName?.test(productName)) { reject(stats, "not_in_collection"); continue; }
           batch.push(mapped);
         }
         const changed = await saveSourceRecords(SOURCE, LICENSE, batch.map((item) => item.sourceRow), dryRun);

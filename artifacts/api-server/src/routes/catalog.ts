@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { and, asc, eq, ilike, or, sql } from "drizzle-orm";
-import { db, livProducts } from "@workspace/db";
+import { db, livProducts, productAlerts } from "@workspace/db";
 import rateLimit from "express-rate-limit";
 import { seedProducts } from "../catalog/seed";
 import { findProductByBarcode, parseBarcode } from "../catalog/barcode";
@@ -137,6 +137,16 @@ router.get("/catalog/products", (req, res, next) => {
   }
 });
 
+/** Safety notices for a product: ongoing ones, plus any reported in the last 3 years. */
+async function alertsFor(productId: string) {
+  const cutoff = new Date(Date.now() - 3 * 365 * 86_400_000).toISOString().slice(0, 10);
+  const rows = await db.select().from(productAlerts).where(eq(productAlerts.productId, productId));
+  return rows
+    .filter((row) => /ongoing/i.test(row.status ?? "") || (row.reportDate ?? "") >= cutoff)
+    .sort((a, b) => (b.reportDate ?? "").localeCompare(a.reportDate ?? ""))
+    .map((row) => ({ kind: row.kind, title: row.title, detail: row.detail, status: row.status, reportDate: row.reportDate, url: row.url }));
+}
+
 router.get("/catalog/products/:id", async (req, res, next) => {
   try {
     await ensurePilotSeeded();
@@ -144,7 +154,7 @@ router.get("/catalog/products/:id", async (req, res, next) => {
     const [product] = await db.select().from(livProducts).where(eq(livProducts.id, id)).limit(1);
     if (product) {
       assertScoreEvidence(product);
-      res.json({ product });
+      res.json({ product: { ...product, alerts: await alertsFor(product.id) } });
       return;
     }
     const parsed = parseBarcode(id);
@@ -152,7 +162,7 @@ router.get("/catalog/products/:id", async (req, res, next) => {
       const match = await findProductByBarcode(parsed);
       if (match) {
         assertScoreEvidence(match.product);
-        res.json({ product: match.product });
+        res.json({ product: { ...match.product, alerts: await alertsFor(match.product.id) } });
         return;
       }
     }

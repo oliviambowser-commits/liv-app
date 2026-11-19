@@ -14,7 +14,8 @@
     "catalog:funnel": "tsx ./src/scripts/catalog-funnel.ts",
     "catalog:nightly": "tsx ./src/scripts/catalog-nightly.ts",
     "catalog:preflight": "tsx ./src/scripts/catalog-preflight.ts",
-    "catalog:sample": "tsx ./src/scripts/catalog-sample.ts"
+    "catalog:sample": "tsx ./src/scripts/catalog-sample.ts",
+    "catalog:shortlist": "tsx ./src/scripts/catalog-shortlist.ts"
   },
   "dependencies": {
     "@workspace/api-zod": "workspace:*",

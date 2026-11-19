@@ -123,7 +123,8 @@ export async function upsertOwnedProducts(rows: ProductRow[], stats: RunStats, d
       brand: sql`excluded.brand`,
       name: sql`excluded.name`,
       category: sql`excluded.category`,
-      quantity: sql`excluded.quantity`,
+      // Like images, a size added by a later step (FDA package sizes) is never erased by a refresh.
+      quantity: sql`coalesce(excluded.quantity, ${livProducts.quantity})`,
       ingredientsText: sql`excluded.ingredients_text`,
       sourceStatus: sql`excluded.source_status`,
       sources: sql`excluded.sources`,

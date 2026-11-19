@@ -6,6 +6,9 @@
  *   open_food_nonfood    Open Food Facts, non-food    weekly (a 4+ million record scan)
  *   openfda              FDA over-the-counter labels  weekly
  *   dailymed_images      images for FDA products      every night, up to 3,000 labels
+ *   openfda_ndc_sizes    package sizes for FDA products  every night, up to 3,000 labels
+ *   openfda_devices      FDA over-the-counter devices  weekly
+ *   fda_drug_recalls     FDA recall notices           weekly
  *   epa_safer_choice     EPA Safer Choice             weekly
  *   energy_star_air_cleaners  ENERGY STAR air cleaners weekly
  *
@@ -27,6 +30,9 @@ import { importOpenFacts, sourceName } from "../catalog/importers/open-facts";
 import { importOpenFda, SOURCE as OPENFDA } from "../catalog/importers/openfda";
 import { ENERGY_STAR_SOURCE, EPA_SOURCE, importEnergyStar, importSaferChoice } from "../catalog/importers/government";
 import { addDailyMedImages, SOURCE as DAILYMED_IMAGES } from "../catalog/importers/dailymed-images";
+import { importDevices, SOURCE as FDA_DEVICES } from "../catalog/importers/devices";
+import { addPackageSizes, SOURCE as NDC_SIZES } from "../catalog/importers/ndc-sizes";
+import { importRecalls, SOURCE as FDA_RECALLS } from "../catalog/importers/recalls";
 
 const DAY = 86_400_000;
 const dryRun = process.env["CATALOG_DRY_RUN"] === "1";
@@ -43,8 +49,14 @@ const jobs: Job[] = [
   { source: OPENFDA, every: 7 * DAY, fullRefresh: true, run: () => importOpenFda(dryRun, log) },
   // Images for FDA products, a few thousand labels per night until all are checked.
   { source: DAILYMED_IMAGES, every: DAY, fullRefresh: false, run: () => addDailyMedImages(dryRun, log) },
+  // Sizes for FDA products, a few thousand labels per night until all are checked.
+  { source: NDC_SIZES, every: DAY, fullRefresh: false, run: () => addPackageSizes(dryRun, log) },
+  // Over-the-counter wellness devices and FDA-cleared air purifiers.
+  { source: FDA_DEVICES, every: 7 * DAY, fullRefresh: true, run: () => importDevices(dryRun, log) },
   { source: EPA_SOURCE, every: 7 * DAY, fullRefresh: true, run: () => importSaferChoice(dryRun, log) },
   { source: ENERGY_STAR_SOURCE, every: 7 * DAY, fullRefresh: true, run: () => importEnergyStar(dryRun, log) },
+  // Recall notices last, so they can match products added earlier in the run.
+  { source: FDA_RECALLS, every: 7 * DAY, fullRefresh: false, run: () => importRecalls(dryRun, log) },
 ];
 
 const REASONS: Record<string, string> = {
@@ -58,6 +70,10 @@ const REASONS: Record<string, string> = {
   barcode_store_internal: "in-store code, not a national product",
   not_in_collection: "not in a Liv collection",
   no_label_image: "label has no package image",
+  no_longer_sold: "no longer sold",
+  size_not_certain: "package size not certain",
+  not_in_catalog: "recalled product not in Liv's catalog",
+  openfda_unavailable: "openFDA didn't respond (retried next run)",
   dailymed_unavailable: "DailyMed didn't respond (retried next run)",
   unreadable: "unreadable line",
 };
