@@ -84,3 +84,17 @@ mtime_ms = 1794853414662
 storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:a9fb3851-435b-4a26-8110-c0d497c67aa2/87bb6ebe-0441-4d69-b88d-37f9906b3a8d/9accff4b-8d15-424a-bc82-a17cb7cd6a06"
 storage_version_token = "1794853475344336"
 content_type = "text/html"
+
+[[outputs]]
+id = "62a9meNpoO11IvrKVbGea"
+uri = "file://artifacts/api-server/reports/best-of-liv-shortlists-2026-11-20.csv"
+type = "table"
+title = "Liv catalog shortlist"
+description = "CSV spreadsheet generated after the live five-source FDA catalog refresh."
+logical_id = "8688c367-1b26-4bd6-ac22-e616df6f0b71"
+content_hash = "sha256:6fec2419635fca0a9b7a0a32de10b3e50f41303c61d263eb4a31614161c039a5"
+size = 32064
+mtime_ms = 1795136402499
+storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:a9fb3851-435b-4a26-8110-c0d497c67aa2/8688c367-1b26-4bd6-ac22-e616df6f0b71/93bd1ce5-cfd2-4974-896b-bf459c2bd71f"
+storage_version_token = "1795136416969415"
+content_type = "text/csv"
