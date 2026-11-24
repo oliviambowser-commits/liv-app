@@ -63,7 +63,10 @@ export function inferCollection(row: CatalogRow): string | null {
   }
   if (row.primarySource === "openfda") {
     const purpose = row.details.find((detail) => detail.label === "Label purpose")?.value ?? "";
-    return LABEL_WORDING.find(([, pattern]) => pattern.test(`${purpose} ${row.name}`))?.[0] ?? null;
+    const found = LABEL_WORDING.find(([, pattern]) => pattern.test(`${purpose} ${row.name}`))?.[0] ?? null;
+    // FDA calls fluoride rinses "anticavity" too; they aren't toothpaste.
+    if (found === "Toothpastes" && /rinse|mouth ?wash/i.test(row.name)) return null;
+    return found;
   }
   return null;
 }

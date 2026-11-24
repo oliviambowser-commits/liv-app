@@ -6,6 +6,7 @@ import { OPEN_SOURCES } from "./open-data";
 import { mapForImport } from "./importers/open-facts";
 import { brandFor, brandIndex, mapLabel } from "./importers/openfda";
 import { mapSaferChoice, preferBarcodeRows } from "./importers/government";
+import { mapDevice } from "./importers/devices";
 import { buildShortlists, inferCollection, isGenericName, type CatalogRow } from "./shortlist";
 
 test("food and other look-alikes no longer land in Liv collections", () => {
@@ -76,4 +77,21 @@ test("shortlists cover every device type, skip generic names, and prefer known b
   const rows = [row("1", "Aardvark Supply Co", "open_beauty"), row("2", "Zebra Naturals", "open_beauty"), row("3", "Zebra Naturals", "open_products")];
   const list = buildShortlists(rows, 1).lists.get("Shampoos")!;
   assert.equal(list[0]!.brand, "Zebra Naturals", "a brand in two databases beats an alphabetically earlier one");
+});
+
+test("second pass: mouth rinses, spark plugs, and unreadable device names", () => {
+  assert.equal(matchCollection([], "4 bougies AS42C Ford"), null, "French bougie can mean spark plug");
+  assert.equal(matchCollection([], "Anticavity Fluoride Rinse"), null);
+  const rinse: CatalogRow = { id: "0851939002067", brand: "Meijer", name: "Anticavity Fluoride Rinse", category: "Beauty", primarySource: "openfda", usRelevance: "confirmed", hasIngredients: true, hasImage: true, productUrl: null, details: [{ label: "Label purpose", value: "Anticavity" }], categoryTags: [] };
+  assert.equal(inferCollection(rinse), null);
+  assert.equal(inferCollection({ ...rinse, name: "Crest Complete Multi-Benefit Plus Scope" }), "Toothpastes", "Scope-flavored toothpaste still counts");
+
+  const thermometer = mapDevice({ public_device_record_key: "k1", brand_name: "MEIJER", company_name: "MEIJER, INC.", version_or_model_number: "74-032RP2", is_otc: "true", identifiers: [{ id: "00851939002067", type: "Primary", issuing_agency: "GS1" }], product_codes: [{ name: "Thermometer, Electronic, Clinical" }] } as never, "Wellness Devices", "x");
+  assert.ok("product" in thermometer);
+  assert.equal(thermometer.product.brand, "Meijer");
+  assert.equal(thermometer.product.name, "Meijer Thermometer (74-032RP2)");
+  const mask = mapDevice({ public_device_record_key: "k2", brand_name: "LED Light Therapy Mask - HIME SAMA", company_name: "Shenzhen Rainbow Technology Co., Ltd.", version_or_model_number: "RB-008", is_otc: "true", identifiers: [], product_codes: [{ name: "Light Based Over-The-Counter Wrinkle Reduction" }] } as never, "Wellness Devices", "x");
+  assert.ok("product" in mask);
+  assert.equal(mask.product.brand, "Shenzhen Rainbow Technology", "a product name isn't a brand; the company is");
+  assert.equal(mask.product.name, "LED Light Therapy Mask - HIME SAMA (RB-008)");
 });

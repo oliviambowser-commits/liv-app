@@ -16,7 +16,8 @@ test("device registry records map with GS1 barcodes, and skip what Liv shouldn't
   const result = mapDevice(record as never, "Wellness Devices", "2026-11-19");
   assert.ok("product" in result);
   assert.equal(result.product.id, "0851939002067", "primary GS1 identifier, 14 digits stored as 13");
-  assert.equal(result.product.name, "Theragun Prime (G4-PRIME)");
+  assert.equal(result.product.name, "Theragun Prime Massager (G4-PRIME)");
+  assert.equal(result.product.brand, "Theragun Prime");
   assert.equal(result.product.sourceStatus, "government_registry");
   assert.match(result.product.sources?.[0]?.note ?? "", /not FDA approval/);
   assert.ok(!("gmdn_terms" in result.sourceRow.payload), "licensed GMDN terms are never stored");

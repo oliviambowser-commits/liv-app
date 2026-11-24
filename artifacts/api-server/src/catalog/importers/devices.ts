@@ -1,6 +1,6 @@
 import { parseBarcode } from "../gtin";
 import { noScores } from "../seed";
-import { emptyStats, fetchWithRetry, reject, saveSourceRecords, sleep, upsertOwnedProducts, type ProductRow, type RunStats, type SourceRow } from "../ingest";
+import { emptyStats, titleCase, fetchWithRetry, reject, saveSourceRecords, sleep, upsertOwnedProducts, type ProductRow, type RunStats, type SourceRow } from "../ingest";
 
 /**
  * FDA's device registry (GUDID) via openFDA: barcoded consumer devices with
@@ -47,6 +47,32 @@ export function buildDeviceSearch(productCodeName: string, otcOnly: boolean): st
   return parts.map((part) => encodeURIComponent(part).replace(/%20/g, "+")).join("+AND+");
 }
 
+const MAPPING_VERSION = "2026-11-24";
+
+/** Plain-English device type from FDA's device type wording. */
+export function deviceType(typeNames: string[]): string | null {
+  const text = typeNames.join(" ").toLowerCase();
+  if (/thermometer/.test(text)) return "Thermometer";
+  if (/transcutaneous/.test(text)) return "TENS Unit";
+  if (/muscle/.test(text)) return "Muscle Stimulator";
+  if (/massager/.test(text)) return "Massager";
+  if (/light/.test(text)) return "Light Therapy Device";
+  if (/purifier/.test(text)) return "Air Purifier";
+  return null;
+}
+
+// Whole words only, so a brand like "Theragun" isn't mistaken for a device description.
+const TYPE_WORDS = /\b(thermometers?|tens|massagers?|massage|light|mask|stimulators?|purifiers?|therapy|device|gun)\b/i;
+/** "Shenzhen Rainbow Technology Co., Ltd." -> "Shenzhen Rainbow Technology" (strips every trailing suffix). */
+function cleanCompany(company: string): string {
+  let result = company.trim();
+  for (let previous = ""; previous !== result;) {
+    previous = result;
+    result = result.replace(/[,.]?\s*\b(inc|llc|ltd|corp|corporation|co|company|limited)\.?,?$/i, "").trim();
+  }
+  return titleCase(result);
+}
+
 /** Maps one registry record to a product, or a reason it's skipped. */
 export function mapDevice(record: UdiRecord, collection: string, retrievedAt: string, exclude?: RegExp): { product: ProductRow; sourceRow: SourceRow } | { reason: string } {
   const key = record.public_device_record_key;
@@ -69,14 +95,23 @@ export function mapDevice(record: UdiRecord, collection: string, retrievedAt: st
     ...(typeNames.length ? [{ label: "FDA device type", value: typeNames.slice(0, 3).join("; "), sourceUrl: gudid }] : []),
     ...(model ? [{ label: "Model or version", value: model.slice(0, 80), sourceUrl: gudid }] : []),
     ...(deviceClass ? [{ label: "FDA device class", value: `Class ${deviceClass}`, sourceUrl: gudid }] : []),
+    ...(record.company_name?.trim() ? [{ label: "Company that registered the device", value: record.company_name.trim().slice(0, 120), sourceUrl: gudid }] : []),
     { label: "Sold over the counter", value: String(record.is_otc) === "true" ? "Yes" : "Not listed as over the counter", sourceUrl: gudid },
     ...(record.device_description?.trim() ? [{ label: "Registry description", value: record.device_description.trim().slice(0, 300), sourceUrl: gudid }] : []),
   ];
-  const name = model && !brandName.toLowerCase().includes(model.toLowerCase()) ? `${brandName} (${model})` : brandName;
+  // The registry's brand field holds the consumer brand ("EQUATE", "UP & UP")
+  // or sometimes a product name ("LED Light Therapy Mask"). Short names without
+  // device words are brands; otherwise the company is the brand.
+  const brandTitle = /[a-z]/.test(brandName) ? brandName : titleCase(brandName);
+  const looksLikeBrand = brandName.split(/\s+/).length <= 3 && !TYPE_WORDS.test(brandName);
+  const brand = looksLikeBrand ? brandTitle : cleanCompany(record.company_name ?? "") || brandTitle;
+  const type = deviceType(typeNames);
+  const base = looksLikeBrand && type ? `${brandTitle} ${type}` : brandTitle;
+  const name = model && !base.toLowerCase().includes(model.toLowerCase()) ? `${base} (${model})` : base;
   return {
     product: {
       id,
-      brand: record.company_name?.trim().slice(0, 80) || "Company not listed",
+      brand: brand.slice(0, 80) || "Company not listed",
       name: name.slice(0, 160),
       category: "Wellness",
       quantity: null,
@@ -109,6 +144,7 @@ export function mapDevice(record: UdiRecord, collection: string, retrievedAt: st
       sourceKey: key,
       productId: id,
       payload: {
+        _liv_mapping: MAPPING_VERSION,
         public_device_record_key: key, brand_name: record.brand_name, company_name: record.company_name,
         version_or_model_number: record.version_or_model_number, catalog_number: record.catalog_number,
         device_description: record.device_description, commercial_distribution_status: record.commercial_distribution_status,
