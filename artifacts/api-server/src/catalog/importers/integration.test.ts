@@ -79,6 +79,7 @@ test("imports never overwrite another source's product, skip unchanged data, and
     assert.equal(third.notListed, 2, "the body wash and the enriched-row test product both dropped out");
     const [stillThere] = await db.select().from(livProducts).where(eq(livProducts.id, "0012345678905"));
     assert.ok(stillThere, "not deleted");
+    assert.equal(stillThere?.listed, false, "but hidden from search and shortlists");
     const [runRow] = await db.select().from(ingestionRuns).where(eq(ingestionRuns.id, run.id));
     assert.equal(runRow?.status, "succeeded");
 

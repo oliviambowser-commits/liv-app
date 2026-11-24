@@ -42,6 +42,9 @@ export function mapSaferChoice(raw: Record<string, unknown>, retrievedAt: string
   const name = row["product_name"];
   const company = row["company_name"];
   if (!name) return { reason: "missing_name" };
+  // Business-only products (janitorial, institutional) aren't sold to consumers.
+  const audience = Object.entries(row).filter(([key]) => /sector|market|channel|audience|use_type/.test(key)).map(([, value]) => value).join(" ");
+  if (/industrial|institutional|commercial|janitorial|professional/i.test(audience) && !/consumer|household|residential/i.test(audience)) return { reason: "not_consumer" };
   const barcode = firstBarcode(row["gtin"], row["upc"]);
   // No barcode: company + name, plus the part number when there is one, so
   // different sizes or variants of a product stay separate products.
@@ -85,8 +88,19 @@ export function mapSaferChoice(raw: Record<string, unknown>, retrievedAt: string
       primarySource: EPA_SOURCE,
       usRelevance: "confirmed",
     },
-    sourceRow: { sourceKey: id, productId: id, payload: row },
+    sourceRow: { sourceKey: id, productId: id, payload: { ...row, _liv_mapping: "2026-11-24" } },
   };
+}
+
+/**
+ * EPA lists some products in several rows, with and without a barcode. Keep
+ * the barcoded rows and drop name-only duplicates of the same product.
+ */
+export function preferBarcodeRows<T extends { product: ProductRow }>(items: T[]): { kept: T[]; dropped: number } {
+  const key = (item: T) => `${slug(item.product.brand)}|${slug(item.product.name)}`;
+  const withBarcode = new Set(items.filter((item) => /^\d{8,14}$/.test(item.product.id)).map(key));
+  const kept = items.filter((item) => /^\d{8,14}$/.test(item.product.id) || !withBarcode.has(key(item)));
+  return { kept, dropped: items.length - kept.length };
 }
 
 async function fetchSaferChoiceRows(log: (line: string) => void): Promise<Record<string, unknown>[]> {
@@ -121,9 +135,11 @@ export async function importSaferChoice(dryRun: boolean, log: (line: string) => 
     if ("reason" in result) reject(stats, result.reason);
     else mapped.push(result);
   }
-  log(`EPA Safer Choice: ${mapped.length.toLocaleString()} products${dryRun ? " (dry run)" : ""}`);
-  for (let i = 0; i < mapped.length; i += 500) {
-    const slice = mapped.slice(i, i + 500);
+  const { kept, dropped } = preferBarcodeRows(mapped);
+  for (let i = 0; i < dropped; i += 1) reject(stats, "duplicate_without_barcode");
+  log(`EPA Safer Choice: ${kept.length.toLocaleString()} products${dryRun ? " (dry run)" : ""}`);
+  for (let i = 0; i < kept.length; i += 500) {
+    const slice = kept.slice(i, i + 500);
     const changed = await saveSourceRecords(EPA_SOURCE, EPA_LICENSE, slice.map((item) => item.sourceRow), dryRun);
     const toWrite = slice.filter((item) => changed.has(item.sourceRow.sourceKey)).map((item) => item.product);
     stats.unchanged += slice.length - toWrite.length;

@@ -106,7 +106,8 @@ router.get("/catalog/products", (req, res, next) => {
     const products = await db
       .select()
       .from(livProducts)
-      .where(where)
+      // Products a source no longer lists (or that left Liv's scope) stay hidden.
+      .where(where ? and(eq(livProducts.listed, true), where) : eq(livProducts.listed, true))
       .orderBy(asc(livProducts.brand), asc(livProducts.name))
       .offset((page - 1) * 25)
       .limit(25);

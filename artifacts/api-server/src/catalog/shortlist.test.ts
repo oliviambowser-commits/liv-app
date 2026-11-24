@@ -24,16 +24,16 @@ test("lists what each product still lacks before research", () => {
 
 test("shortlists favor complete records, one product per brand, and a mix of sources", () => {
   const rows: CatalogRow[] = [];
-  for (let i = 0; i < 12; i += 1) rows.push(row({ id: `obf-${i}`, brand: `OBF Brand ${i}`, name: `Body Wash ${i}`, categoryTags: ["en:shower-gels"] }));
-  rows.push(row({ id: "dup", brand: "OBF Brand 0 Inc", name: "Body Wash Twin", categoryTags: ["en:shower-gels"] }));
+  for (let i = 0; i < 12; i += 1) rows.push(row({ id: `obf-${i}`, brand: `OBF Brand ${i}`, name: `Gentle Body Wash Scent ${String.fromCharCode(65 + i)}`, categoryTags: ["en:shower-gels"] }));
+  rows.push(row({ id: "dup", brand: "OBF Brand 0 Inc", name: "Gentle Body Wash Twin", categoryTags: ["en:shower-gels"] }));
   rows.push(row({ id: "fda-1", brand: "Label Co", name: "Antibacterial Body Wash", primarySource: "openfda", categoryTags: ["en:shower-gels"] }));
-  rows.push(row({ id: "sparse", brand: "Sparse", name: "Body Wash Sparse", hasIngredients: false, hasImage: false, usRelevance: "likely", categoryTags: ["en:shower-gels"] }));
+  rows.push(row({ id: "sparse", brand: "Sparse", name: "Gentle Body Wash Sparse", hasIngredients: false, hasImage: false, usRelevance: "likely", categoryTags: ["en:shower-gels"] }));
   rows.push(row({ id: "nobrand", brand: "Brand not listed", name: "Mystery Wash", categoryTags: ["en:shower-gels"] }));
   const { lists, available } = buildShortlists(rows, 10);
   const list = lists.get("Body Washes")!;
   assert.equal(list.length, 10);
   assert.equal(list[0]!.id, "fda-1", "official label source and full info first");
-  assert.ok(!list.some((item) => item.id === "dup"), "same brand only once, even with 'Inc'");
+  assert.equal(list.filter((item) => item.id === "dup" || item.id === "obf-0").length, 1, "same brand only once, even with 'Inc'");
   assert.ok(!list.some((item) => item.id === "sparse"), "sparse records lose to complete ones");
   assert.ok(!list.some((item) => item.id === "nobrand"), "unknown brands are skipped");
   assert.equal(available.get("Body Washes"), 15);
@@ -42,8 +42,8 @@ test("shortlists favor complete records, one product per brand, and a mix of sou
 
 test("source cap keeps one database from filling a whole list when others exist", () => {
   const rows: CatalogRow[] = [];
-  for (let i = 0; i < 10; i += 1) rows.push(row({ id: `a${i}`, brand: `A${i}`, name: `Shampoo A${i}`, categoryTags: ["en:shampoos"], primarySource: "open_beauty" }));
-  for (let i = 0; i < 10; i += 1) rows.push(row({ id: `b${i}`, brand: `B${i}`, name: `Shampoo B${i}`, categoryTags: ["en:shampoos"], primarySource: "open_products" }));
+  for (let i = 0; i < 10; i += 1) rows.push(row({ id: `a${i}`, brand: `A${i}`, name: `Volume Shampoo Line ${String.fromCharCode(65 + i)}`, categoryTags: ["en:shampoos"], primarySource: "open_beauty" }));
+  for (let i = 0; i < 10; i += 1) rows.push(row({ id: `b${i}`, brand: `B${i}`, name: `Repair Shampoo Line ${String.fromCharCode(65 + i)}`, categoryTags: ["en:shampoos"], primarySource: "open_products" }));
   const list = buildShortlists(rows, 10).lists.get("Shampoos")!;
   assert.ok(list.filter((item) => item.primarySource === "open_beauty").length <= 6);
   assert.equal(list.length, 10);

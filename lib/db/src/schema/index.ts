@@ -75,6 +75,9 @@ export const livProducts = pgTable("liv_products", {
   primarySource: text("primary_source"),
   // confirmed (tagged as sold in the US), likely (US barcode or US retailer), possible, or null.
   usRelevance: text("us_relevance"),
+  // False when the owning source no longer lists the product, or it no longer
+  // fits Liv's scope. Hidden from search and shortlists; never deleted.
+  listed: boolean("listed").notNull().default(true),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

@@ -1,3 +1,5 @@
+import { inArray } from "drizzle-orm";
+import { db, livProducts } from "@workspace/db";
 import { parseBarcode } from "../gtin";
 import { matchCollection } from "../funnel";
 import { noScores } from "../seed";
@@ -57,6 +59,43 @@ export const CATEGORY_QUERIES: Array<{ key: string; purpose: string; collection:
 
 const SKIN = new Set(["Sunscreens", "Face Moisturizers", "Lip Balms", "Face Cleansers", "Face Serums"]);
 
+/** Bump when mapping rules change so existing labels are rewritten on the next run. */
+export const MAPPING_VERSION = "2026-11-24";
+
+/** What a product is, for names that are only a brand ("Dove" becomes "Dove Antiperspirant"). */
+const PRODUCT_TYPE: Record<string, string> = {
+  Sunscreens: "Sunscreen", "Lip Balms": "Lip Balm", Toothpastes: "Toothpaste", Deodorants: "Antiperspirant",
+  "Hand Soaps": "Hand Soap", Shampoos: "Shampoo", Conditioners: "Conditioner", "Face Cleansers": "Acne Treatment",
+  "Body Lotions": "Skin Protectant", "Body Washes": "Body Wash", "Face Moisturizers": "Moisturizer",
+};
+
+/** Known consumer brands, keyed by lowercase name, longest first. */
+export type BrandIndex = Array<[string, string]>;
+
+export function brandIndex(brands: string[]): BrandIndex {
+  const byKey = new Map<string, string>();
+  for (const brand of brands) {
+    const key = brand.trim().toLowerCase();
+    if (key.length >= 3 && !/not listed/.test(key) && !byKey.has(key)) byKey.set(key, brand.trim());
+  }
+  return [...byKey.entries()].sort((a, b) => b[0].length - a[0].length);
+}
+
+/**
+ * The consumer brand for an FDA label: a known brand the product name starts
+ * with, else a one-word product name (labels often name just the brand), else
+ * the company that filed the label, cleaned up.
+ */
+export function brandFor(productName: string, labeler: string | undefined, known: BrandIndex): string {
+  const lower = productName.toLowerCase();
+  const match = known.find(([key]) => lower === key || lower.startsWith(`${key} `));
+  if (match) return match[1];
+  if (!/\s/.test(productName.trim()) && productName.trim().length <= 25) return productName.trim();
+  const company = labeler ?? "";
+  const dba = /d\/?b\/?a\/?\s*(.+)$/i.exec(company);
+  return titleCase((dba?.[1] ?? company).trim()).slice(0, 80) || "Labeler not listed";
+}
+
 export function buildSearch(purpose: string, range?: [string, string]): string {
   const parts = ['openfda.product_type:"HUMAN OTC DRUG"', `purpose:"${purpose}"`];
   if (range) parts.push(`effective_time:[${range[0]} TO ${range[1]}]`);
@@ -77,14 +116,16 @@ export function splitRange([from, to]: [string, string]): [[string, string], [st
 }
 
 /** Maps one label to its products (one per barcode) and its unedited source record. */
-export function mapLabel(label: OpenFdaLabel, collectionHint: string, retrievedAt: string): { products: ProductRow[]; sourceRow: SourceRow } | { reason: string } {
+export function mapLabel(label: OpenFdaLabel, collectionHint: string, retrievedAt: string, known: BrandIndex = []): { products: ProductRow[]; sourceRow: SourceRow } | { reason: string } {
   const setId = label.set_id;
   const fda = label.openfda ?? {};
   const rawName = fda.brand_name?.[0] ?? fda.generic_name?.[0];
   if (!setId) return { reason: "missing_set_id" };
   if (!rawName) return { reason: "missing_name" };
-  const name = titleCase(rawName).slice(0, 160);
-  const collection = matchCollection([], name) ?? collectionHint;
+  const labelName = titleCase(rawName).slice(0, 160);
+  const collection = matchCollection([], labelName) ?? collectionHint;
+  const brand = brandFor(labelName, fda.manufacturer_name?.[0], known);
+  const name = labelName.toLowerCase() === brand.toLowerCase() && PRODUCT_TYPE[collection] ? `${labelName} ${PRODUCT_TYPE[collection]}` : labelName;
   const barcodes = [...new Set((fda.upc ?? [])
     .map((code) => parseBarcode(code))
     .filter((parsed): parsed is Exclude<ReturnType<typeof parseBarcode>, string> => typeof parsed !== "string")
@@ -99,9 +140,10 @@ export function mapLabel(label: OpenFdaLabel, collectionHint: string, retrievedA
     ...(purpose ? [{ label: "Label purpose", value: purpose, sourceUrl: dailymed }] : []),
     ...(fda.substance_name?.length ? [{ label: "Active ingredients", value: fda.substance_name.slice(0, 8).map(titleCase).join(", "), sourceUrl: dailymed }] : []),
     ...(effective ? [{ label: "Label version date", value: effective, sourceUrl: dailymed }] : []),
+    ...(fda.manufacturer_name?.[0] ? [{ label: "Company that filed the FDA label", value: titleCase(fda.manufacturer_name[0]).slice(0, 120), sourceUrl: dailymed }] : []),
   ];
   const base = {
-    brand: fda.manufacturer_name?.[0] ? titleCase(fda.manufacturer_name[0]).slice(0, 80) : "Labeler not listed",
+    brand,
     name,
     category: SKIN.has(collection) ? "Skincare" : "Beauty",
     quantity: null,
@@ -114,7 +156,7 @@ export function mapLabel(label: OpenFdaLabel, collectionHint: string, retrievedA
       license: LICENSE,
       retrievedAt,
       sourceUpdatedAt: effective,
-      note: "Official labeling submitted by the manufacturer to FDA. Not an FDA endorsement or an efficacy rating. The brand shown is the company that submitted the label.",
+      note: "Official labeling submitted by the manufacturer to FDA. Not an FDA endorsement or an efficacy rating.",
     }],
     ingredientEvidence: [],
     scores: noScores,
@@ -131,6 +173,7 @@ export function mapLabel(label: OpenFdaLabel, collectionHint: string, retrievedA
   const ids = barcodes.length ? barcodes : [`fda-${setId}`];
   const products: ProductRow[] = ids.map((id) => ({ ...base, id, matchConfidence: barcodes.length ? "confirmed" : "probable" }));
   const payload: Record<string, unknown> = {
+    _liv_mapping: MAPPING_VERSION,
     set_id: setId, id: label.id, version: label.version, effective_time: label.effective_time,
     purpose: label.purpose, active_ingredient: label.active_ingredient, inactive_ingredient: label.inactive_ingredient,
     openfda: { brand_name: fda.brand_name, generic_name: fda.generic_name, manufacturer_name: fda.manufacturer_name, substance_name: fda.substance_name, upc: fda.upc, package_ndc: fda.package_ndc },
@@ -172,6 +215,11 @@ export async function planWindows(purpose: string, fetcher: Fetcher, range: [str
 export async function importOpenFda(dryRun: boolean, log: (line: string) => void, fetcher: Fetcher = apiFetcher()): Promise<RunStats> {
   const stats = emptyStats();
   const retrievedAt = new Date().toISOString().slice(0, 10);
+  // Consumer brands already in Liv, so FDA products show "Neutrogena", not the parent company.
+  const consumerBrands = await db.selectDistinct({ brand: livProducts.brand }).from(livProducts)
+    .where(inArray(livProducts.primarySource, ["open_beauty", "open_products", "open_food_nonfood"]))
+    .catch(() => [] as Array<{ brand: string }>);
+  const known = brandIndex(consumerBrands.map((row) => row.brand));
   if (!process.env["OPENFDA_API_KEY"]) log("openFDA: no OPENFDA_API_KEY set, so requests are slow and limited to 1,000 a day. A free key from open.fda.gov removes that limit.");
   for (const category of CATEGORY_QUERIES) {
     const windows = await planWindows(category.purpose, fetcher);
@@ -183,7 +231,7 @@ export async function importOpenFda(dryRun: boolean, log: (line: string) => void
         const batch: Array<{ sourceRow: SourceRow; products: ProductRow[] }> = [];
         for (const label of results) {
           stats.read += 1;
-          const mapped = mapLabel(label, category.collection, retrievedAt);
+          const mapped = mapLabel(label, category.collection, retrievedAt, known);
           if ("reason" in mapped) { reject(stats, mapped.reason); continue; }
           const productName = mapped.products[0]!.name;
           if ((category.nameFilter && !category.nameFilter.test(productName)) || category.excludeName?.test(productName)) { reject(stats, "not_in_collection"); continue; }

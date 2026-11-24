@@ -27,7 +27,8 @@ async function main() {
            (p.image_url is not null) as has_image, p.product_url, p.details,
            coalesce(s.payload->'categories_tags', '[]'::jsonb) as category_tags
     from liv_products p
-    left join source_records s on s.source = p.primary_source and s.source_key = p.id`);
+    left join source_records s on s.source = p.primary_source and s.source_key = p.id
+    where p.listed = true`);
   const raw = ((result as unknown as { rows?: Record<string, unknown>[] }).rows ?? (result as unknown as Record<string, unknown>[]));
   const rows: CatalogRow[] = raw.map((row) => ({
     id: String(row["id"]),

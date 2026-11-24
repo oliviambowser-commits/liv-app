@@ -136,6 +136,7 @@ export async function upsertOwnedProducts(rows: ProductRow[], stats: RunStats, d
       details: sql`excluded.details`,
       primarySource: sql`excluded.primary_source`,
       usRelevance: sql`excluded.us_relevance`,
+      listed: sql`true`,
       updatedAt: sql`now()`,
     },
     // Second guard in the database itself: only rows this source owns change.
@@ -143,13 +144,24 @@ export async function upsertOwnedProducts(rows: ProductRow[], stats: RunStats, d
   });
 }
 
-/** Marks records a full refresh no longer found. Nothing is deleted. */
+/**
+ * Marks records a full refresh no longer found (or that no longer fit Liv's
+ * scope), and hides the products this source owns for them. Nothing is deleted.
+ */
 export async function markNotListed(source: string, runStartedAt: Date, dryRun: boolean): Promise<number> {
   const stale = await db.select({ key: sourceRecords.sourceKey }).from(sourceRecords)
     .where(and(eq(sourceRecords.source, source), eq(sourceRecords.status, "active"), lt(sourceRecords.lastSeenAt, runStartedAt)));
   if (!dryRun && stale.length) {
     await db.update(sourceRecords).set({ status: "not_listed" })
       .where(and(eq(sourceRecords.source, source), eq(sourceRecords.status, "active"), lt(sourceRecords.lastSeenAt, runStartedAt)));
+  }
+  if (!dryRun) {
+    // Hide owned products whose every record from this source is no longer listed.
+    await db.execute(sql`
+      update liv_products p set listed = false, updated_at = now()
+      where p.primary_source = ${source} and p.listed = true
+        and exists (select 1 from source_records s where s.source = ${source} and s.product_id = p.id)
+        and not exists (select 1 from source_records s where s.source = ${source} and s.product_id = p.id and s.status = 'active')`);
   }
   return stale.length;
 }

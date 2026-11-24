@@ -3,7 +3,7 @@ import { createInterface } from "node:readline";
 import { Readable } from "node:stream";
 import { createGunzip } from "node:zlib";
 import { OPEN_SOURCES, mapOpenFactsRecord, type OpenSource } from "../open-data";
-import { classifyRecord, type FunnelRecord, type UsRelevance } from "../funnel";
+import { FOOD_TAGS, categoryForCollection, classifyRecord, matchCollection, type FunnelRecord, type UsRelevance } from "../funnel";
 import { emptyStats, reject, saveSourceRecords, upsertOwnedProducts, type ProductRow, type RunStats, type SourceRow } from "../ingest";
 
 /**
@@ -16,6 +16,12 @@ const KEPT_FIELDS = [
   "code", "product_name", "product_name_en", "brands", "quantity", "ingredients_text", "ingredients_text_en",
   "categories_tags", "countries_tags", "stores_tags", "image_front_url", "images", "last_modified_t",
 ] as const;
+
+/**
+ * Bump when the mapping rules change, so every record is rewritten with the
+ * new rules on the next run even if the source data itself didn't change.
+ */
+export const MAPPING_VERSION = "2026-11-24";
 
 /** Which US relevance tiers to import. Default: confirmed and likely. */
 export function importTiers(): Set<UsRelevance> {
@@ -31,8 +37,21 @@ export function sourceName(key: OpenSource["key"]) {
 export function mapForImport(record: FunnelRecord, source: OpenSource, tiers: Set<UsRelevance>):
   { product: ProductRow; sourceRow: SourceRow } | { reason: string } {
   const classified = classifyRecord(record);
-  // Open Food Facts: only the non-food items that belong in a Liv collection.
-  if (source.key === "food" && !classified.collection) return { reason: "food_item" };
+  const tags = Array.isArray(record.categories_tags) ? (record.categories_tags as unknown[]).filter((tag): tag is string => typeof tag === "string") : [];
+  let collection: string | null;
+  if (source.key === "food") {
+    // Open Food Facts: only items its own categories mark as non-food and as
+    // one of Liv's collections. Product names alone never qualify.
+    if (!tags.length || tags.some((tag) => FOOD_TAGS.test(tag))) return { reason: "food_item" };
+    collection = matchCollection(tags, classified.name, { useName: false });
+    if (!collection) return { reason: "food_item" };
+  } else if (source.key === "products") {
+    // Open Products Facts covers everything from phones to furniture: keep Liv's collections only.
+    collection = matchCollection(tags, classified.name);
+    if (!collection) return { reason: "out_of_scope" };
+  } else {
+    collection = matchCollection(tags, classified.name);
+  }
   if (classified.barcodeProblem) return { reason: `barcode_${classified.barcodeProblem}` };
   if (!classified.name) return { reason: "missing_name" };
   if (!tiers.has(classified.usRelevance)) return { reason: `us_${classified.usRelevance}` };
@@ -43,8 +62,8 @@ export function mapForImport(record: FunnelRecord, source: OpenSource, tiers: Se
   // Keep whichever language field the name came from.
   for (const [field, value] of Object.entries(record)) if (/^product_name_[a-z]{2}$/.test(field) && value) payload[field] = value;
   return {
-    product: { ...mapped, primarySource: sourceName(source.key), usRelevance: classified.usRelevance },
-    sourceRow: { sourceKey: mapped.id, productId: mapped.id, payload },
+    product: { ...mapped, category: categoryForCollection(collection, mapped.category), primarySource: sourceName(source.key), usRelevance: classified.usRelevance },
+    sourceRow: { sourceKey: mapped.id, productId: mapped.id, payload: { ...payload, _liv_mapping: MAPPING_VERSION } },
   };
 }
 

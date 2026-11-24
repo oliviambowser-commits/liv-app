@@ -135,6 +135,7 @@ function toLivProduct(item: ProviderProduct, provider: Provider): LivProduct | n
     details: [],
     primarySource: null,
     usRelevance: null,
+    listed: true,
     updatedAt: new Date(),
   };
 }
